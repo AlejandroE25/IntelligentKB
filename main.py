@@ -143,62 +143,239 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <title>KB AI Search Agent</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: sans-serif; background: #f4f4f4; display: flex;
-           flex-direction: column; height: 100vh; }
-    header { background: #1a73e8; color: white; padding: 12px 20px;
-             display: flex; align-items: center; justify-content: space-between; }
-    header h1 { font-size: 1.1rem; }
-    header a { color: white; font-size: 0.85rem; text-decoration: none;
-               border: 1px solid rgba(255,255,255,0.6); padding: 4px 10px;
-               border-radius: 4px; }
-    header a:hover { background: rgba(255,255,255,0.15); }
-    #chat { flex: 1; overflow-y: auto; padding: 16px; display: flex;
-            flex-direction: column; gap: 12px; }
-    .msg { max-width: 80%; padding: 10px 14px; border-radius: 8px;
-           line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
-    .msg.user { background: #1a73e8; color: white; align-self: flex-end; }
-    .msg.assistant { background: white; border: 1px solid #ddd;
-                     align-self: flex-start; }
-    .msg.assistant a { color: #1a73e8; }
-    .msg.error { background: #fdecea; border: 1px solid #f5c6cb;
-                 color: #721c24; align-self: flex-start; }
-    footer { background: white; border-top: 1px solid #ddd; padding: 12px 16px; }
-    form { display: flex; gap: 8px; }
-    textarea { flex: 1; padding: 8px 12px; border: 1px solid #ccc;
-               border-radius: 6px; resize: none; font-size: 0.95rem;
-               font-family: inherit; height: 44px; line-height: 1.4; }
-    textarea:focus { outline: none; border-color: #1a73e8; }
-    button[type=submit] { background: #1a73e8; color: white; border: none;
-                          border-radius: 6px; padding: 0 18px; font-size: 0.95rem;
-                          cursor: pointer; white-space: nowrap; }
-    button[type=submit]:hover { background: #1558b0; }
-    .empty-state { color: #888; text-align: center; margin: auto;
-                   font-size: 0.95rem; }
+
+    :root {
+      --green:  #33ff33;
+      --green2: #00cc00;
+      --amber:  #ffaa00;
+      --dim:    #1a5c1a;
+      --bg:     #0d0d0d;
+      --bg2:    #111111;
+      --border: #225522;
+    }
+
+    body {
+      font-family: "Courier New", Courier, monospace;
+      background: var(--bg);
+      color: var(--green);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* scanline flicker overlay */
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0,0,0,0.07) 0px,
+        rgba(0,0,0,0.07) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: var(--bg2);
+      border-bottom: 2px solid var(--green2);
+      padding: 6px 12px;
+      flex-shrink: 0;
+    }
+    .hdr-top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    header h1 {
+      font-size: 1rem;
+      font-weight: bold;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--green);
+      text-shadow: 0 0 8px var(--green2);
+    }
+    header a {
+      color: var(--amber);
+      font-size: 0.75rem;
+      text-decoration: none;
+      border: 1px solid var(--amber);
+      padding: 2px 8px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    header a:hover { background: var(--amber); color: #000; }
+    .hdr-rule {
+      font-size: 0.65rem;
+      color: var(--dim);
+      letter-spacing: 1px;
+      margin-top: 3px;
+      user-select: none;
+    }
+
+    /* ── TRANSCRIPT ── */
+    #chat {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    /* custom scrollbar */
+    #chat::-webkit-scrollbar { width: 8px; }
+    #chat::-webkit-scrollbar-track { background: var(--bg); }
+    #chat::-webkit-scrollbar-thumb { background: var(--green2); }
+
+    .entry { margin-bottom: 10px; }
+
+    .entry-label {
+      font-size: 0.7rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .entry.user   .entry-label { color: var(--amber); }
+    .entry.assistant .entry-label { color: var(--green2); }
+    .entry.error  .entry-label { color: #ff3333; }
+
+    .entry-body {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      line-height: 1.55;
+      font-size: 0.9rem;
+      padding: 6px 10px;
+      border-left: 3px solid;
+    }
+    .entry.user      .entry-body { border-color: var(--amber);  color: #ffd080; }
+    .entry.assistant .entry-body { border-color: var(--green2); color: var(--green); }
+    .entry.error     .entry-body { border-color: #ff3333; color: #ff6666; }
+
+    .entry.assistant .entry-body a {
+      color: var(--amber);
+      text-decoration: underline;
+    }
+    .entry.assistant .entry-body a:hover { color: #fff; }
+
+    .empty-state {
+      color: var(--dim);
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+      margin: auto;
+      text-align: center;
+    }
+    .cursor { animation: blink 1s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) {
+      .cursor { animation: none; }
+    }
+
+    /* ── FOOTER / INPUT ── */
+    footer {
+      background: var(--bg2);
+      border-top: 2px solid var(--green2);
+      padding: 8px 12px;
+      flex-shrink: 0;
+    }
+    .prompt-line {
+      font-size: 0.7rem;
+      color: var(--dim);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    form { display: flex; gap: 8px; align-items: flex-end; }
+    textarea {
+      flex: 1;
+      background: #000;
+      color: var(--green);
+      border: 1px solid var(--green2);
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      resize: none;
+      height: 42px;
+      line-height: 1.45;
+      caret-color: var(--green);
+      outline: none;
+    }
+    textarea::placeholder { color: var(--dim); }
+    textarea:focus { border-color: var(--green); box-shadow: 0 0 6px var(--green2); }
+    button[type=submit] {
+      background: #000;
+      color: var(--green);
+      border: 1px solid var(--green2);
+      font-family: inherit;
+      font-size: 0.85rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 0 14px;
+      height: 42px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    button[type=submit]:hover {
+      background: var(--green2);
+      color: #000;
+      box-shadow: 0 0 8px var(--green2);
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1>KB AI Search Agent</h1>
-    <a href="/clear">New Conversation</a>
+    <div class="hdr-top">
+      <h1><span aria-hidden="true">&#x25A0;</span> KB AI Search Agent v1.0</h1>
+      <a href="/clear">[NEW SESSION]</a>
+    </div>
+    <div class="hdr-rule">
+      &gt;&gt; HELP DESK KNOWLEDGE BASE TERMINAL &lt;&lt;
+      &nbsp;&nbsp;///&nbsp;&nbsp;
+      TYPE QUERY. PRESS ENTER.
+    </div>
   </header>
+
   <div id="chat">
     {% if not conversation %}
-      <p class="empty-state">Describe a support issue and press Enter (or click Send).</p>
+      <p class="empty-state">
+        C:\\HELPDESK&gt; _<span class="cursor" aria-hidden="true">&#x2588;</span><br><br>
+        SYSTEM READY. ENTER SUPPORT ISSUE BELOW.
+      </p>
     {% endif %}
     {% for msg in conversation %}
-      <div class="msg {{ msg.role }}">{{ msg.content }}</div>
+      <div class="entry {{ msg.role }}">
+        <div class="entry-label">
+          {% if msg.role == 'user' %}
+            &gt;&gt; USER INPUT
+          {% else %}
+            &lt;&lt; KB AGENT
+          {% endif %}
+        </div>
+        <div class="entry-body">{{ msg.content }}</div>
+      </div>
     {% endfor %}
     {% if error %}
-      <div class="msg error">{{ error }}</div>
+      <div class="entry error">
+        <div class="entry-label">!! ERROR</div>
+        <div class="entry-body">{{ error }}</div>
+      </div>
     {% endif %}
   </div>
+
   <footer>
+    <div class="prompt-line">C:\\HELPDESK&gt; enter query:</div>
     <form method="post" action="/">
-      <textarea name="issue" placeholder="Describe the support issue…"
+      <textarea name="issue" placeholder="Describe the support issue..."
                 autofocus>{{ prefill }}</textarea>
-      <button type="submit">Send</button>
+      <button type="submit">[SEND]</button>
     </form>
   </footer>
+
   <script>
     // Auto-scroll to bottom on load
     const chat = document.getElementById('chat');
