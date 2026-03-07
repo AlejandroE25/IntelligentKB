@@ -1,0 +1,464 @@
+<!DOCTYPE html><html lang="en-US"><head><script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-5MRHB7J');</script><title>Multi-Factor Authentication (MFA), Troubleshooting</title><script src="https://code.jquery.com/jquery-1.11.2.min.js"></script><style>.expand-control-icon::before{  content:url('/graph/plus.png');}.expand-content{  display:block;  opacity: 1;}.expand-hidden{ display: none; opacity: 0;} .cloakDefaultClose{    background-image: url(/images/group180/shared/wiki/navigate_down_10.gif);    width: 10px;    height: 10px;    display: inline-block;    }.cloakDefaultOpen{    background-image: url(/images/group180/shared/wiki/navigate_right_10.gif);    width: 10px;    height: 10px;    display: inline-block;}  </style><script src="https://code.jquery.com/jquery-1.11.2.min.js"></script><script>jQuery(document).on('click', '.expand-control', function(event) {              $elt=jQuery(this).next('.expand-content');              if($elt.hasClass("expand-hidden")){              $elt.removeClass("expand-hidden");              }else{              $elt.addClass("expand-hidden");              }                  });</script><meta http-equiv="content-type" content="text/html; charset=utf-8"><meta name="description" content=""><meta name="keywords" content="KnowledgeBase, knowledge base, universities, colleges, higher education, knowledge sharing, knowledge collaboration, technical support self-service solutions"><meta name="application-name" content="University KnowledgeBase"><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="/css/kbs-base.js?v=26292" type="text/javascript"></script><link rel="stylesheet" type="text/css" media="screen" href="/css/froala-editor@3.2.2/froala_style.min.css"><link rel="stylesheet" type="text/css" media="screen" href="/css/froala-editor@3.2.2/froala_override.css"><link rel="stylesheet" type="text/css" media="screen" href="/css/tinymce@5/content.css"><link rel="stylesheet" type="text/css" media="screen" href="/css/kbs-base.css?v=26292"><link rel="stylesheet" type="text/css" media="screen" href="/css/default_layout1.css?v=26292"><style>/* 
+This "Custom CSS Four" file was originally copied from the External Custom CSS One file present on answers.uillinois.edu/illinois/ in December 2023.
+
+Custom CSS One is being left in place for now, so that switching from the new Four to the old One is relatively simple in case of breakage.
+
+Prior to this file's creation, Custom CSS Four held a copy of the unimplemented cloakDefaultClose and cloakDefaultOpen code still found in Internal's Custom CSS Two.
+ */
+
+/*-----*/
+
+/* un-clicked links */
+.kbleftlinks a, .kbrightlinks a, a, #qlinks a, #qcats a, #resource-links a, #news a, #topDocs a, #recentDocs a, .custom a, #cat-nav ul li a  {color:#2F568C; text-decoration:underline;}
+
+/* hovered-over links */
+.kbleftlinks a:hover, .kbrightlinks a:hover, a:hover, #qlinks a:hover, #qcats a:hover, #resource-links a:hover, #news a:hover, #topDocs a:hover, #recentDocs a:hover, .custom a:hover, #cat-nav ul li a:hover {color:#C84113;}
+
+/* already-clicked links */
+.kbleftlinks a:visited, .kbrightlinks a:visited, a:visited, #qlinks a:visited, #qcats a:visited, #resource-links a:visited, #news a:visited, #topDocs a:visited, #recentDocs a:visited, .custom a:visited, #cat-nav ul li a:visited {color:#00779F;}
+
+/* section headings */
+.kbleftlinks .head, .kbrightlinks .head, #qlinks .head, #qcats .head, #resource-links .head,  #news h2, #topDocs h2, #recentDocs h2, .custom h2, #cat-nav ul li a h2 {background-color:#FF5F05; color:#252525;}
+.kbleftlinks ul, .kbrightlinks ul, #qlinks ul, #qcats ul, #resource-links ul {border-left-color:#FF5F05; border-right-color:#FF5F05; border-bottom-color:#FF5F05;}
+.kbleftlinks li, .kbrightlinks li, #qlinks li, #qcats ul, #resource-links li {border-bottom-color:#13294B;}
+
+/* main header */
+#top-links {background-color:#FF5F05;}
+#top-links-int {background-color:#080808;}
+#logo-search, #search-form {background:#13294B;}
+
+/* 'Site Map' and other header buttons */
+#search-form a {color: #0E0F20 !important; border: 1px solid #0E0F20 !important; background-color:#F4BCA9;}
+
+
+/* unknown or unimplemented */
+.kbleftlinks a, .kbrightlinks a, #qlinks a, #qcats a, #resource-links a, #cat-nav ul li a {text-decoration:none;}
+a[name] {color:inherit; background-color:inherit; text-decoration:inherit;}
+a.boxlink, input.boxlink {font-size:11px; color:#365899; background-color:#eceef5; text-decoration:none; padding:0px 6px 0px 6px; border:1px solid #cad4e7; margin-left:2px; margin-bottom:5px; text-align:right; border-radius:4px;}
+
+/* add-ons */
+.kbleftlinks ul {border:0;}
+
+.kbleftlinks li {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+nav ul li {
+  margin: 0;
+  padding: .5em 0px .5em 0px;
+  list-style-type: none;
+  font-size: 1.2em; }
+
+nav ul li a {
+  display: block; }
+
+nav ul li a:hover { 
+color: #A9852A; 
+  text-decoration: none; }
+
+.offscreen {
+    left: -200em;
+    position: absolute;
+    top: -20em; }
+
+.status {
+  background: url(/images/group180/shared/logo/info.png) left top no-repeat;
+  background-size: 1.5em;
+ }
+
+.ticket {
+  background: url(/images/group180/shared/logo/partners.png) left top no-repeat; 
+  background-size: 1.5em;
+}
+
+.email { 
+  background: url(/images/group180/shared/logo/email.png) left top no-repeat; 
+  background-size: 1.5em;
+}
+
+.call {
+  background: url(/images/group180/shared/logo/call.png) left top no-repeat; 
+  background-size: 1.5em;
+}
+
+.add-contact h3 {
+  font-family="Montserrat," sans-serif; 
+  font-size: 16px;
+  font-weight: normal;
+  margin: 0;
+  padding-bottom: 8px; }
+
+/*end image-bulleted left nav styles */
+
+div.rightbox
+{
+float: right;
+padding: .5em;
+width: 15%;
+border: .1em solid grey;
+}
+
+
+/* Styling the content links in the Lync left nav */
+#middle-sect3 .kbleftlinks:first-child a 
+{
+	font-size: 1.2em;
+}
+
+/* Making the headlines easier to scan for */
+#maincontent ul
+{
+	display:table;
+}
+
+#maincontent
+{
+	padding-left:2em;
+}
+#maincontent h1, #maincontent h2, #maincontent h3, #maincontent h4
+{
+	margin-left:-1.5em;
+}
+
+/* Table styling from Keith Hays */
+#maincontent table 
+{
+border-collapse: collapse;
+}
+#maincontent td, #maincontent th 
+{ 
+border: 1px solid #000
+}
+#maincontent th 
+{ 
+background-color: #eee;
+}
+
+/* Note, warning, alert, info box styles based on the wiki visuals */
+.note-box, .tip-box, .warning-box, .info-box, .code-block-box, .page-alert-box {
+    border-color: #be7;
+    border-radius: 5px;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.1);
+    margin: 10px 0;
+    overflow: hidden;
+    padding: 1rem;
+}
+.note-box {
+	background-color: #ffffce;
+	margin: 10px 0em;
+	padding: 1rem;
+
+}
+.note-box p:first-child::before {
+    content: url("/images/group180/shared/images/note-warning-mini.png");  
+    margin-right: 10px;
+}
+
+.tip-box {
+	background-color: #dfd;
+	margin: 10px 0em;
+	padding: 1rem;
+}
+.tip-box p:first-child::before {
+    content: url("/images/group180/shared/images/note-check-mini.gif");  
+    margin-right: 10px;
+}
+
+.warning-box {
+	background-color: #fcc;
+	margin: 10px 0em;
+	padding: 1rem;
+}
+
+.warning-box p:first-child::before {
+    content: url("/images/group180/shared/images/note-forbidden-mini.gif");  
+    margin-right: 10px;
+}
+
+
+.info-box {
+    background-color:#BFC9D9;
+}
+.info-box p:first-child::before {
+    content: url("/images/group180/shared/images/note-info-mini.gif");  
+    margin-right: 10px;
+}
+.code {
+    font-family: monospace;
+    font-size: 13px;
+    line-height: 1.1em;
+}
+.code-block-box {
+    background-color: #ccc;
+    border: 1px dashed #666;
+    font-family: monospace;
+    font-size: 13px;
+    line-height: 1.1em;
+}
+.page-alert-box {
+    background: url("/images/group180/shared/images/note-info.gif") no-repeat scroll left top #ffffce;
+    border-color: #be7;
+    padding-left: 50px;
+}
+.checklist-box {
+    margin-bottom: 10px;
+    margin-left: 10px;
+}
+.checklist-box .checked {
+    background: url("/images/group180/shared/images/checkbox-checked.gif") no-repeat scroll left center rgba(0, 0, 0, 0);
+    margin-bottom: 10px;
+    padding-left: 25px;
+}
+.checklist-box .unchecked {
+    background: url("/images/group180/shared/images/checkbox-trans.gif") no-repeat scroll left center rgba(0, 0, 0, 0);
+    margin-bottom: 10px;
+    padding-left: 25px;
+}
+.checklist-box .crossed {
+    background: url("/images/group180/shared/images/checkbox-red-x.gif") no-repeat scroll left center rgba(0, 0, 0, 0);
+    margin-bottom: 10px;
+    padding-left: 25px;
+}
+
+.left-menu { /* make sure this class comes after the alert-box classes */
+	margin-left: 21%;
+}
+
+/* Classtech Photo Templates */
+figure.roomphoto {
+   max-width: 500px;
+   border-style: solid;
+   border-width: 1px;
+}
+
+img.roomphoto {
+    border-bottom: solid 1px;
+}
+
+figcaption.roomphoto {
+    padding: 12px;
+}
+
+img.tablephoto {
+    height: 64px;
+    border-radius: 5px;
+}
+
+/* new callouts */
+div.orangecallout {
+    border-style: solid; 
+    border-color: #ff5f05; 
+    background-color: #ffcc99; 
+    padding: 22px;
+}</style><link rel="stylesheet" type="text/css" media="screen" href="/css/uw-buttons.css"><link rel="stylesheet" type="text/css" media="print" href="/css/print.css"></head><body><noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5MRHB7J" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript><div id="skip-nav"><a href="#maincontent">Skip navigation</a></div><div id="body-container"><header role="banner"><div id="top-links-int"><div class="section group top"><div class="col span_top_1_of_3"><span class="hidden">Multi-Factor Authentication (MFA), Troubleshooting</span></div><div class="col span_top_2_of_3"><div id="top-left-links"><ul><li class="first"><a href="http://illinois.edu/">University of Illinois</a></li></ul></div></div><div class="col span_top_3_of_3"><div id="top-right-links"><ul><li class="first"><a href="http://techservices.illinois.edu/services">Services & Info</a></li><li><a href="http://techservices.illinois.edu/contact">Contact Us</a></li><li><a href="/Shibboleth.sso/Logout">Sign out</a></li></ul></div></div></div></div><div id="logo-search"><div class="section group logo-search"><div class="col span_logo-search_1_of_2"><div id="group-logo"><a href="./"><img src="/images/group180/logo/CIO-Dark.png" alt="University of Illinois Internal KB" width="375" height="80"><span class="group-name-hide">University of Illinois Technology Services</span></a></div></div><div class="col span_logo-search_2_of_2"><div id="search-form" class="upper" role="search"><form accept-charset="UTF-8" method="get" action="search.php" title="Search"><span id="resultc" role="status" aria-live="polite"></span><br><label for="q" class="hidden">Search term</label><input class="inputBox" id="q" type="text" name="q" placeholder="Search the KB..." value="" size="36" maxlength="140" onkeyup="resultC(this.value)" aria-controls="resultc" aria-autocomplete="both" > <label for="cat" class="hidden">Select topic</label><select class="selectBox kb-dropdown-fixed-300m" id="cat" name="cat" onchange="this.form.submit();"><option value="0">All Topics</option><option value="4561">Accounts and passwords</option><option value="4573">&nbsp; Password manager</option><option value="4672">CCME</option><option value="4562">Communication and collaboration</option><option value="7361">&nbsp; cPanel web hosting</option><option value="6284">&nbsp; DigitalsSignage </option><option value="4581">&nbsp; Exchange</option><option value="4582">&nbsp; Google Apps @ Illinois</option><option value="9935">&nbsp; Illinois mobile app</option><option value="4579">&nbsp; Illinois wiki</option><option value="5287">&nbsp; Kaltura</option><option value="4583">&nbsp; Lync / Skype for Business</option><option value="5169">&nbsp; Office 365</option><option value="4584">&nbsp; Publish.illinois.edu (PIE)</option><option value="4586">&nbsp; U of I Box</option><option value="8615">&nbsp; ZOOM</option><option value="4563">Computing infrastructure</option><option value="5987">&nbsp; Amazon Web Services</option><option value="4564">Help and training</option><option value="4596">&nbsp; Accessibility outreach </option><option value="4600">&nbsp; Help Desk</option><option value="14322">&nbsp; KnowledgeBase</option><option value="4608">&nbsp; OnSite consulting</option><option value="4613">&nbsp; Status</option><option value="4615">&nbsp; Training services (FAST 3)</option><option value="4616">&nbsp; Usability consulting</option><option value="14016">Human Resources</option><option value="14017">&nbsp; Training & development</option><option value="5700">Known errors</option><option value="4565">Networking</option><option value="4619">&nbsp; Virtual private networking (VPN)</option><option value="4627">&nbsp; Wireless</option><option value="14500">&nbsp; &nbsp; Wireless KB Rewrite</option><option value="4566">Printing and software</option><option value="4631">&nbsp; WebStore</option><option value="4567">Safety and security</option><option value="5699">Swanlund</option><option value="4568">Teaching and learning</option><option value="8487">&nbsp; Canvas@illinois.edu</option><option value="4651">&nbsp; Illinois Compass 2G</option></select> <label for="aud" class="hidden">Select audience</label><select class="selectBox kb-dropdown-fixed-300m" id="aud" name="aud" onchange="this.form.submit();"><option value="0">All Audiences</option><option value="100">Undergraduate students</option><option value="101">Graduate students</option><option value="102">Faculty and staff</option><option value="99">IT Pros</option></select> <input class="search" type="submit" value="SEARCH"></form></div><script>if(document.getElementsByClassName("search")){document.getElementsByClassName("search")[0].addEventListener("click", searchBtn);}</script></div></div></div></header><div id="container"><div id="middle-sect3"><div class="section group middle-sect3"><div class="col span_middle3_1_of_3"><nav role="navigation" aria-labelledby="Quicklinks"><div class="kbleftlinks"><span id="Quicklinks" class="head">Quick links</span><ul id="kbleftul0"><div class="fr-element fr-view"><div class="print-doc-body"><div class="kbleftlinks"><nav>
+<h2 class="offscreen">Help Options</h2>
+<ul>
+<li><a href="http://status.illinois.edu/" class="status">&nbsp; &nbsp; &nbsp;Check status</a></li>
+<li><a href="https://help.uillinois.edu/TDClient/42/UIUC/Home/" class="ticket">&nbsp; &nbsp; &nbsp;Get help</a></li>
+<li><a href="mailto:consult@illinois.edu" class="email">&nbsp; &nbsp; &nbsp;Email the Help Desk</a></li>
+<li><a href="tel:+12172447000" class="call">&nbsp; &nbsp; &nbsp;Call the Help Desk<br />&nbsp; &nbsp; &nbsp;(217) 244-7000</a></li>
+<li><span><a href="https://appserv7.admin.uillinois.edu/FormBuilderSurvey/Survey/uiuc_technology_services/help_desk/submit_a_suggestion/" target="_blank" title="submit" rel="noopener">Submit a suggestion</a></span></li>
+</ul>
+</nav><!-- commenting out content that will be duplicated above, but leaving in place in case the area and styling wants to be used for other content
+
+<div class="add-contact clearfix">
+            	<h3><br /></h3></div><div class="add-contact clearfix">
+            </div>
+            <div class="add-contact clearfix">    
+                <h3>Urbana-Champaign</h3> 
+                	<div class="campuses">
+	                	<a href="https://techservices.illinois.edu/get-help/help-desk">Technology Services at Illinois</a><br />
+	                	<a href="tel:+12172447000">(217) 244-7000</a><br />
+						<a href="mailto:consult@illinois.edu">consult@illinois.edu</a></div>
+--></div></div></div></ul></div></nav></div><div class="col span_middle3_2_of_3"><main id="maincontent" role="main"><div id="page-content" role="article"><div class="fr-element fr-view"><h1 class="title">Multi-Factor Authentication (MFA), Troubleshooting</h1><div style="float:right;text-align:right;padding:1px;border-radius:2px;"> <input class="boxlink doc-action" type="submit" value="Show changes" onclick="window.open('resultc.php?action=7&amp;id=85687','Show Changes','scrollbars=yes,resizable=yes,titlebar=no,menubar=no,location=no,directories=no,status=no,width=800,height=780');return false;"> <a class="boxlink doc-action" href="/kbAdmin/document.php?group_id=180&amp;openEditor=1&amp;id=85687" target="_blank" rel="noopener">Edit page</a></div><div class="doc-summary">This article can help with common issues users may encounter when trying to use multi-factor authentication (MFA).</div><div class="doc-body"><!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd">
+<h2><a id="passcode"></a>Requesting a Temporary Passcode</h2><p><span style="font-family: Helvetica;">Should you lose, misplace, or forget your MFA device and cannot authenticate, you can request a temporary passcode. These can also be requested if you are going to a testing center and will not have access to your device.</span><span style="font-family: Helvetica;"></span></p><ul>
+<li><span style="font-family: Helvetica;">Passcodes are good for 3 days or 100 uses, whichever comes first. You can request 24 passcodes per year, so these should not be relied upon as a primary authentication method.</span></li>
+</ul><p><span style="font-family: Helvetica;">The instructions below assume that you know your password. If you do not know your password, please contact your Help Desk.</span></p><h2 class="panel-head">You need to request a Passcode in advance (i.e. you currently have your device)</h2><div class="panel-content">
+<ol>
+<li><span style="font-family: Helvetica;">Visit the <span><a href="https://identity.uillinois.edu" target="_blank" title="https://identity.uillinois.edu" rel="noopener">NetID Center</a></span>.</span></li>
+<li><span style="font-family: Helvetica;">Select <strong>Temporary Passcode</strong> at the bottom of the page.<br></span><span style="font-family: Helvetica;"><br><img src="/images/group179/85687/passcode.jpg" title="temporary passcode" alt="temporary passcode" style="font-family: Helvetica;" width="463" height="442"><br><br></span></li>
+<li><span style="font-family: Helvetica;">Click "Yes, I have my device".</span></li>
+<li><span style="font-family: Helvetica;">Authenticate like normal using the device.</span></li>
+<li><span style="font-family: Helvetica;">Your passcode will then be displayed along with the expiration date.<br><br><span><img src="/images/group179/85687/temp_bypass_3.jpg" title="Temporary Passcode" alt="Temporary Passcode" width="348" height="317"></span></span></li>
+</ol>
+</div><div>
+<h2 class="panel-head">You do not have your device and need a passcode now</h2>
+<div class="panel-content">
+<ol>
+<li><span style="font-family: Helvetica;">Visit the <span><a href="https://identity.uillinois.edu/" target="_blank" title="https://identity.uillinois.edu" rel="noopener">NetID Center</a></span>.</span></li>
+<li><span style="font-family: Helvetica;">Select <strong>Temporary passcode</strong> at the bottom of the page.<br></span><span style="font-family: Helvetica;"><br><img src="/images/group179/85687/passcode.jpg" title="temporary passcode" alt="temporary passcode" style="font-family: Helvetica;" width="439" height="419"><br><br></span></li>
+<li><span style="font-family: Helvetica;">Click "No, I don't have my device".</span></li>
+<li><span style="font-family: Helvetica;">Authenticate using your password.</span></li>
+<li><span style="font-family: Helvetica;">An email with a passcode will be sent to your password recovery email. The e<span>mail will be from noreply@uillinois.edu and subject will be <strong>UI Verify Temporary Passcode</strong>.</span><br><br><span><img src="/images/group179/85687/temp_bypass_5.jpg" title="emailed code" alt="emailed code" width="543" height="340"></span><br><br>If you do not have recovery options set up or cannot access your recovery options, you will need to call your <span><a href="https://answers.uillinois.edu/89915" target="_blank" title="University Service Desk" rel="noopener">University Service Desk</a></span> to get a temporary passcode.<br></span>
+<p><span style="font-family: Helvetica;">Once you receive a temporary passcode, please visit </span><span style="font-family: Helvetica;"><a href="https://identity.uillinois.edu/" target="_blank" title="https://verify.uillinois.edu/manage" rel="noopener">https://identity.uillinois.edu </a></span><span style="font-family: Helvetica;">to set up your recovery email under the Recovery Settings.</span></p>
+<p><span style="font-family: Helvetica;">For instructions on setting up recovery options, see <a href="page.php?id=49281" rel="noopener noreferrer" target="_blank">NetID Center, Set and modify your recovery options</a>.</span></p>
+</li>
+</ol>
+</div>
+<hr>
+<h2>How to use a temporary passcode</h2>
+<h2 class="panel-head">Duo Universal Prompt (Microsoft365 (Outlook, Word, Excel, etc.), Shibboleth (Canvas, Box, Zoom, Moodle, etc.), or the NetID Center):</h2>
+<div class="panel-content">
+<ol>
+<li><span style="font-family: Helvetica;">Go to the application you are trying to access that requires MFA and login with your NetID and password.</span></li>
+<li><span style="font-family: Helvetica;">Select the&nbsp;<strong>Bypass code</strong>&nbsp;option.</span></li>
+<li><span style="font-family: Helvetica;">Enter the code and click Verify.</span></li>
+</ol>
+<p><img src="/images/group180/shared/IAM/duo-up-bypass.png" alt="Screenshot highlighting the bypass code option at the Duo Universal Prompt" style="font-family: Helvetica;" width="373" height="506">&nbsp;</p>
+</div>
+<h2 class="panel-head">AITS Duo Prompt (some AITS Applications such as Banner, HR Reporting, My UI Info, Direct Deposit, etc.):</h2>
+<div class="panel-content">
+<ol>
+<li><span style="font-family: Helvetica;">Go to the application you are trying to access that requires MFA.</span></li>
+<li><span style="font-family: Helvetica;">Select&nbsp;<strong>Temporary Passcode</strong>&nbsp;from the drop down<br></span></li>
+<li><span style="font-family: Helvetica;">Enter the passcode and click Enter.</span></li>
+</ol>
+<p><span style="font-family: Helvetica;">&nbsp;</span><span style="font-family: Helvetica;">&nbsp;<img src="/images/group180/shared/2FA/NoSMS/AITS-Duo-NoCall-DropDownPasscode.png" alt="screenshot showing temp passcode option at duo custom iframe" width="476" height="411"></span></p>
+</div>
+<h2 class="panel-head">Cancel Temporary Passcode:</h2>
+<div class="panel-content">
+<p><span style="font-family: Helvetica;">If you no longer need to use the temporary passcode you requested, you can cancel it for security.</span></p>
+<ol>
+<li><span style="font-family: Helvetica;">Visit the NetID Center at&nbsp;<span><a href="https://identity.uillinois.edu/" target="_blank" title="https://identity.uillinois.edu" rel="noopener">https://identity.uillinois.edu</a>,</span> select <strong>Manage my 2FA </strong>under 2-Factor Authentication <br></span></li>
+<li>Under My Devices &amp; Settings select the next to Temporary Passcode and then the trash can to delete/expire the code.<span style="font-family: Helvetica; font-size: medium;"><br></span></li>
+</ol>
+<p><img src="/images/group179/85687/temp_bypass_12.jpg" title="expire code" alt="expire code" width="503" height="310"><span style="font-family: Helvetica;"><br></span></p>
+</div>
+</div><hr><h2>Other Topics</h2><h2 class="panel-head">Duo Remembered Devices Feature not working</h2><div class="panel-content">
+<p>If you choose for Duo to remember you or trust your browser, a trusted session will be created for 24 hours between you, your browser, and the endpoint you are logging into. This involves using a browser cookie. If you have restrictive cookie settings in your browser, you may run into issues utilizing this feature. This Duo documentation page has more details: <a href="https://help.duo.com/s/article/2189?language=en_US">https://help.duo.com/s/article/2189?language=en_US</a>.</p>
+<ul>
+<li><strong>Remember:</strong> Do not trust the browser when using a public or shared computer! This could leave your Duo session available to other users. Trust the browser only when you access applications from your own computer.</li>
+</ul>
+<div>
+<p></p>
+<p>If the above didn't work, try the following troubleshooting steps:</p>
+<ul>
+<li>Clear your browser's cache/cookies (<a target="_blank" rel="noopener noreferrer" href="https://answers.uillinois.edu/illinois/internal/page.php?id=115654">Browsers, Clearing Cache and Cookies</a>).</li>
+<li>Try using a different browser for a few hours.</li>
+</ul>
+<p></p>
+<p>If these steps do not solve the issue, please send the following information to your campus Help Desk:</p>
+<ul>
+<li>
+<p>Operating System (Android, iOS, Windows, Mac etc.).</p>
+</li>
+<li>
+<p>What browser you use (Chrome, Firefox, Safari, etc.).</p>
+</li>
+<li>
+<p>The last site where you experienced this problem (Canvas, Outlook, etc.).</p>
+</li>
+<li>
+<p>Any browser plugins/extensions you have.</p>
+</li>
+<li>
+<p>If you are using the VPN and which campus (UIC, UIS, UIUC, AITS).</p>
+</li>
+</ul>
+<p></p>
+</div>
+</div><h2 class="panel-head" id="NoConnection">I don't have internet access (no mobile phone connectivity)</h2><div class="panel-content">
+<p>There are several options for authenticating when your smartphone does not have a network connection. The following options are perfect for traveling when you may not have internet access on your mobile phone, or if you do not have access to your typical device.</p>
+<ol>
+<li>The Duo Mobile app for smartphones allows you to generate a passcode to login, even if your phone is not connected to the internet. This is a free and easy way to authenticate wherever you are regardless of network connection. Instructions on using this method can be found here: <a href="page.php?id=65948" rel="noopener noreferrer" target="_blank">Multi-Factor Authentication (MFA), Device Management</a>.</li>
+<li>Hardware tokens work without an internet connection. This means you can use them anywhere in the world to log into your account. More information can be found here: <a href="page.php?id=72159" rel="noopener noreferrer" target="_blank">Multi-Factor Authentication (MFA), Hardware Tokens and Security Keys</a>.</li>
+<li>As mentioned at the top of the article, you can get a temporary bypass code <a href="https://identity.uillinois.edu/iamFrontEnd/iam/passcode" target="_blank" rel="noopener">here</a>.The bypass code will last for 3 days and can be used 100 times. You can request a temporary passcode a maximum of 24 times a year.</li>
+</ol>
+</div><h2 class="panel-head" id="device-change-notifications">Notifications from Duo When Adding/Removing Devices</h2><div class="panel-content">
+<p>To help protect your Duo account from unauthorized activity, you will receive a Duo push and an email notification when you add or remove an authentication device in Duo.</p>
+<p>More information available <a href="https://answers.uillinois.edu/illinois/page.php?id=65948#device-change-notification" target="_blank" rel="noopener">here</a>.</p>
+</div><h2 class="panel-head">Duo prompt display issues</h2><div class="panel-content">
+<p>Please see this article for assistance: <a href="page.php?id=108918" rel="noopener noreferrer" target="_blank">Multi-Factor Authentication (MFA), Duo Prompt Display Issues</a>.</p>
+</div><h2 class="panel-head">Duo says my account has been locked out</h2><div class="panel-content">
+<p>You will see one of two error messages:</p>
+<ul>
+<li>"Account disabled. Your Duo account is disabled and cannot access this application. Please contact your IT help desk."</li>
+<li>"Your account has been locked out due to excessive authentication failures. Please contact your administrator."</li>
+</ul>
+<p>This is triggered after 10 failed login attempts. You will need to wait 5 minutes after the last attempt before trying again. If you need assistance with managing your devices, please see this article: <a href="page.php?id=65948" rel="noopener noreferrer" target="_blank">Multi-Factor Authentication (MFA), Device Management</a>.</p>
+</div><h2 class="panel-head">I would like to do MFA with Microsoft instead of Duo</h2><div class="panel-content">
+<p><strong>Microsoft Authenticator</strong>&nbsp;-&nbsp;The Microsoft Authenticator app is available on&nbsp;iOS and iPadOS (15.0 or later) as well as Android (8.0 and later). Use the following link to install, make sure to pick your device listed (initially it gives you the iOS, you can select Android if you have an Android device.)&nbsp;<a rel="noopener" target="_blank" href="https://go.illinois.edu/MFA_Setup">MFA Setup Link</a></p>
+</div><h2></h2><ul>
+<li class="kb-class-internal-site">
+<h2><a id="internal"></a>Internal Troubleshooting Notes</h2>
+<p>The below instructions should help to troubleshoot issues that customers receive. If you still need assistance, you may also want to check out the the AITS Service Desk article (<a href="page.php?id=66761" rel="noopener noreferrer" target="_blank">AITS - Service Desk - 2FA/DUO Support</a>.</p>
+<ul>
+<li>We have a related article meant to help overcome customer objections to using Duo or MFA in general: <a href="page.php?id=120222" rel="noopener noreferrer" target="_blank">Multi-Factor Authentication (MFA), Addressing Solutions for using Duo MFA</a>.</li>
+</ul>
+<p>Also, this flow chart might help (click to expand):</p>
+<p><a href="/images/group180/shared/IAM/MFA-Bypass-Codes-Flowchart-New.png" target="_blank" rel="noopener"><img src="/images/group180/shared/IAM/MFA-Bypass-Codes-Flowchart-New.png" alt="Flowchart for what to do when people need a MFA bypass code" width="768" height="597"></a></p>
+<hr>
+<h3>User can't send themselves a MFA bypass code and they do not know their password.</h3>
+<ol>
+<li>Send a 1-time password reset token to the recovery email on file in ISA.
+<ul>
+<li>If they don't have access to it, please ask your Team Lead or a full-timer for assistance.</li>
+</ul>
+</li>
+<li>You will also need to send a MFA bypass code. Use the button in ISA to send to their recovery email.
+<ul>
+<li>Follow steps for updating the recovery email if needed.</li>
+</ul>
+</li>
+<li>Customer will get two emails:
+<ul>
+<li>2FA bypass email from 'noreply@illinois.edu' with subject '2FA Temporary Code'. The 9-digit code will be in the body of the email.</li>
+<li>Password reset email from 'noreply@uillinois.edu' with subject 'University of Illinois - NetID Password Reset'. Have them click on the link in the email.</li>
+</ul>
+</li>
+<li>After clicking on the link in the password reset email, they will arrive at the Duo Universal Prompt.</li>
+<li>If it tries to get them to authenticate via their default method, have them cancel out of that, and click on 'Other options'<br><img src="/images/group180/shared/IAM/duo-up-other-option.png" alt="Duo universal prompt other options" width="376" height="467"></li>
+<li>On the next screen where it shows their list of devices, have them select the option at the bottom, 'Bypass code'<br><img src="/images/group180/shared/IAM/duo-up-bypasscode2.png" width="372" height="692" alt="Bypasscode for duo"></li>
+<li>Have them put in the 9-digit code from the 2FA bypass email and click on Verify. They will then be able to set their recovery options and set a new password.</li>
+<li>Take this opportunity to remind them to keep recovery options up to date and to use the Duo Mobile app!</li>
+</ol>
+<hr>
+<h3>User cannot use Duo at the NetID Center</h3>
+<p>The Duo Universal Prompt used at the NetID Center (and other AITS apps) does not support user enrollment via the prompt. This can sometimes lead to a catch-22 type of situation where a user needs to sign up for Duo, but cannot log into the NetID Center to do so.<br><br>To get around this, have the user try to log into their email via <a href="https://outlook.office.com">https://outlook.office.com</a>. The Urbana Duo Prompt does support user enrollment and device management via the prompt so it should allow them to enroll. This should be fixed in the future.<span style="text-decoration: line-through;"></span></p>
+<ol></ol>
+<hr>
+<h3>User's Enterprise ID and NetID Don't Match</h3>
+<p>For users whose NetID and Enterprise ID don't match (usually older users with a dash (-) in their ID), they have to set passwords for each account separately. They will also need to manage their MFA devices separately.</p>
+<ul>
+<li>Maybe they'd be interested in merging their NetID and Enterprise ID? See this KB for more info: <a href="page.php?id=56999" rel="noopener noreferrer" target="_blank">NetID Change, Merging multiple NetIDs</a>.</li>
+</ul>
+</li>
+</ul>
+<div class="kb-page-see-also"><h2>See Also</h2><ul><li><a href="page.php?id=65971">Multi-Factor Authentication (MFA), Introduction</a></li><li><a href="page.php?id=138345">Multi-Factor Authentication (MFA), How to Use</a></li><li><a href="page.php?id=65947">Multi-Factor Authentication (MFA), Enrollment</a></li><li><a href="page.php?id=65948">Multi-Factor Authentication (MFA), Device Management</a></li><li><a href="page.php?id=85687">Multi-Factor Authentication (MFA), Troubleshooting</a></li><li><a href="page.php?id=72159">Multi-Factor Authentication (MFA), Hardware Tokens and Security Keys</a></li></ul></div></div></div></div><br style="clear:both;"><hr class="kbhr1"><div class="doc-info"><div class="doc-attr keywords"><div class="doc-attr-name">Keywords:</div><div class="doc-attr-value"><span id="kb-page-keywords">2FA, 2-factor authentication, Two-factor authentication, Duo, Duo Security, Verify, UI Verify, enrollment, multi-factor, multifactor, security, AITS, temporary, passcode, bypass code, mfa, request, enterprise id, remember me, bank account, uin, last 4, lost phone, phone number</span>&nbsp; <span id="suggestk-button"><button class="feedback-btn-link" onclick="suggestK(85687,'Multi-Factor+Authentication+%28MFA%29%2C+Troubleshooting','2FA%2C+2-factor+authentication%2C+Two-factor+authentication%2C+Duo%2C+Duo+Security%2C+Verify%2C+UI+Verify%2C+enrollment%2C+multi-factor%2C+multifactor%2C+security%2C+AITS%2C+temporary%2C+passcode%2C+bypass+code%2C+mfa%2C+request%2C+en');">Suggest keywords</button></span><div id="suggestk" aria-expanded="false" style="clear:both; float:left; width:50%;"></div><div id="ks-thank-you" role="status" aria-live="polite" aria-hidden="true" tabindex="-1" style="display:none;">We appreciate your suggestion. Thank you!</div></div></div><div class="doc-attr id"><div class="doc-attr-name">Doc ID:</div><div class="doc-attr-value">85687</div></div><div class="doc-attr owner"><div class="doc-attr-name">Owned&nbsp;by:</div><div class="doc-attr-value"><span class="doc-attr-value-owner-name">Identity and Access Management G. in </span>University of Illinois Technology Services</div></div><div class="doc-attr created"><div class="doc-attr-name">Created:</div><div class="doc-attr-value">2018-09-17</div></div><div class="doc-attr updated"><div class="doc-attr-name">Updated:</div><div class="doc-attr-value">2025-05-28</div></div><div class="doc-attr sites"><div class="doc-attr-name">Sites:</div><div class="doc-attr-value"><a href="https://answers.uillinois.edu/illinois/85687">UniversityofIllinoisTech Serv-external</a>, UniversityofIllinoisTechServ-internal</div></div><div class="doc-attr sites"><div class="doc-attr-name">External link:</div><div class="doc-attr-value"><span id="extLink">https://answers.uillinois.edu/illinois/85687</span> <span class="kbs-copy-icon" onclick="copyElTextToClipboard('extLink')"><img alt="Copy external link" src="/css/svg/copy-14.svg"><span class="kbs-copy-tooltip extLink">Copy</span></span></div></div><div class="doc-attr cleanurl"><div class="doc-attr-name">Clean&nbsp;URL:</div><div class="doc-attr-value"><a href="https://answers.uillinois.edu/illinois/internal/request-temporary-passcode">https://answers.uillinois.edu/illinois/internal/request-temporary-passcode</a></div></div><div class="doc-attr feedback"><div class="doc-attr-value"><input type="hidden" id="did" value="85687"><span id="vote-yes"><input type="button" id="helpfulBtn" class="feedback-btn-yes" value="Helpful"></span> <span id="count-yes">3</span> &nbsp; <span id="vote-no"><input type="button" id="unhelpfulBtn" class="feedback-btn-no" value="Unhelpful"></span> <span id="count-no">109</span> &nbsp; <script>if(document.getElementById("helpfulBtn")){document.getElementById("helpfulBtn").addEventListener("click", yesVote);}if(document.getElementById("unhelpfulBtn")){document.getElementById("unhelpfulBtn").addEventListener("click", noVote);}</script> <span class="doc-comment"><a class="feedback-btn-link" href="feedback.php?action=2&amp;help=comment&amp;id=85687">Comment</a></span> <span class="email-to-cust"><a class="feedback-btn-link" href="feedback.php?action=2&amp;help=email&amp;id=85687">Email to customer</a></span> <span class="suggest-doc3"><a class="feedback-btn-link" href="feedback.php?action=2&amp;help=suggest&amp;id=85687">Suggest new doc</a></span> <span class="sub-to-change"><a class="feedback-btn-link" href="feedback.php?action=2&amp;help=subscribe&amp;id=85687">Subscribe to changes</a></span> <span id="fav-doc"><input type="button" class="boxlink" value="Mark as favorite" onclick="markAsFavDoc(85687,13);"></span><span id="feedback-thank-you"></span></div></div></div></main></div><div class="col span_middle3_3_of_3"><aside role="complementary" aria-labelledby="KBhelp"><div class="kbrightlinks"><span id="KBhelp" class="head">KB help</span><ul id="kbrightul0"><li><a href="/kbAdmin/index.php">KB admin tools</a></li><li><a href="/kbGuide/">KB user guide</a></li><li><a href="/kbGuide/page.php?id=5235">How to create a document</a></li><li><a href="/kbGuide/#FAQ">Frequently asked questions</a></li></ul></div></aside></div></div></div><footer><div id="copyright" role="contentinfo">Copyright © 2026 | <a href="78963" target="_blank" title="Privacy Statement">Privacy</a>
+<br><div id="view-toggle"><p>User: ae42@illinois.edu · <a href="search.php?q=showmyfavoritedocs">Favorites</a>  · <a href="/Shibboleth.sso/Logout">Sign out</a><br></p></div></div></footer></div></div><script type="text/javascript">$(function(){
+   
+
+   $(".cloakToggle").click(function(){
+       
+       
+       
+        $elt=$(this).parent().nextAll(".cloak:first");
+        $toggleimg=$(this).children(":first");
+       
+              if($elt.css("display")=="none"){
+                $toggleimg.removeClass("cloakDefaultOpen");
+                $toggleimg.addClass("cloakDefaultClose");
+              $elt.css("display","block");
+              $elt.css("border","double");
+              $elt.css("padding","15px");
+              }else{
+                 $toggleimg.removeClass("cloakDefaultClose");
+                 $toggleimg.addClass("cloakDefaultOpen");
+              $elt.css("display", "none");
+              $elt.css("border", "none")
+              }
+    }).focus(function() {
+    $(this).bind('keydown', 'space', function(e){
+      if(e.which==32){  
+        $(this).trigger('click')
+        e.preventDefault();
+      }
+    });
+
+}).blur(function() {
+    $(this).unbind('keydown');
+
+}).attr("tabIndex",0);
+
+});</script><script type="text/javascript" src="/cssjs/kb-doc-collapsing-panels.js"></script><script>if(document.getElementsByTagName("a")){let els=document.getElementsByTagName("a");for(let i=0;i<els.length;i++){els[i].addEventListener("click", lnks);}}</script></body></html>
