@@ -3,7 +3,8 @@ KB AI Search Agent
 ==================
 A locally-run web app where a help desk consultant describes a support problem
 in plain English and receives relevant troubleshooting steps drawn from local KB
-articles. All article content is loaded directly into Claude's context window.
+articles. TF-IDF pre-filtering is used to select only the most relevant articles
+for each query before sending them to Claude, reducing context size and cost.
 """
 
 from __future__ import annotations
@@ -14,8 +15,11 @@ import secrets
 import sys
 from pathlib import Path
 
+import numpy as np
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 import anthropic
 from flask import Flask, redirect, render_template_string, request, session, url_for
 
@@ -25,6 +29,10 @@ from flask import Flask, redirect, render_template_string, request, session, url
 ARTICLES_DIR = Path(__file__).parent / "articles"
 MODEL = "claude-sonnet-4-20250514"
 MAX_TOKENS = 1024
+
+# Maximum number of articles sent to Claude per query.
+# Raising this improves recall at the cost of larger context windows.
+TOP_K_ARTICLES = 3
 
 KB_BASE_URL = "https://answers.uillinois.edu/illinois/internal"
 
@@ -110,10 +118,53 @@ def load_articles(articles_dir: Path) -> list[dict[str, str]]:
             articles.append(parse_article(filepath))
     return articles
 
+# ---------------------------------------------------------------------------
+# TF-IDF Article Index
+# ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# System Prompt Builder
-# ---------------------------------------------------------------------------
+def build_article_index(
+    articles: list[dict[str, str]],
+) -> tuple[TfidfVectorizer, np.ndarray]:
+    """Build a TF-IDF index over all KB articles.
+
+    Each article is represented by its title, keywords, and content combined
+    so that all three fields contribute to relevance scoring.
+
+    Returns a ``(vectorizer, doc_matrix)`` tuple.  The document matrix is
+    pre-computed here so it does not need to be recomputed on every query.
+    """
+    corpus = [
+        f"{a['title']} {a['keywords']} {a['content']}"
+        for a in articles
+    ]
+    vectorizer = TfidfVectorizer(stop_words="english", sublinear_tf=True)
+    doc_matrix = vectorizer.fit_transform(corpus)
+    return vectorizer, doc_matrix
+
+
+def select_relevant_articles(
+    query: str,
+    articles: list[dict[str, str]],
+    vectorizer: TfidfVectorizer,
+    doc_matrix: np.ndarray,
+    top_k: int = TOP_K_ARTICLES,
+) -> list[dict[str, str]]:
+    """Return the *top_k* articles most relevant to *query* using TF-IDF cosine similarity.
+
+    Falls back to returning all articles if the query produces an all-zero
+    vector (e.g. it contains only stop-words not present in the corpus).
+    """
+    query_vec = vectorizer.transform([query])
+
+    scores = cosine_similarity(query_vec, doc_matrix).flatten()
+
+    # If every score is zero the query had no useful terms; return all articles.
+    if not np.any(scores):
+        return articles
+
+    top_indices = np.argsort(scores)[::-1][: min(top_k, len(articles))]
+    return [articles[i] for i in top_indices]
+
 
 def build_system_prompt(articles: list[dict[str, str]]) -> str:
     """Construct the full system prompt with all KB article content."""
@@ -437,6 +488,47 @@ def create_app(client: anthropic.Anthropic, system_prompt: str) -> Flask:
             conversation=session.get("conversation", []),
             error=error,
             prefill=prefill,
+def run_cli(
+    client: anthropic.Anthropic,
+    articles: list[dict[str, str]],
+    vectorizer: TfidfVectorizer,
+    doc_matrix: np.ndarray,
+) -> None:
+    """Run the interactive support query loop.
+
+    For each user query, TF-IDF cosine similarity is used to select the
+    most relevant articles before building the system prompt, so that only
+    a small subset of the KB is sent to Claude rather than the full corpus.
+    """
+    conversation: list[dict[str, str]] = []
+
+    print("KB AI Search Agent — type your support issue and press Enter.")
+    print("Type 'quit' or 'exit' to stop.\n")
+
+    while True:
+        try:
+            user_input = input("Enter your support issue: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nGoodbye!")
+            break
+
+        if not user_input:
+            continue
+        if user_input.lower() in {"quit", "exit"}:
+            print("Goodbye!")
+            break
+
+        # Select only the most relevant articles for this query.
+        relevant = select_relevant_articles(user_input, articles, vectorizer, doc_matrix)
+        system_prompt = build_system_prompt(relevant)
+
+        conversation.append({"role": "user", "content": user_input})
+
+        response = client.messages.create(
+            model=MODEL,
+            max_tokens=MAX_TOKENS,
+            system=system_prompt,
+            messages=conversation,
         )
 
     @app.route("/clear")
@@ -494,6 +586,7 @@ def main() -> None:
     print(f"\nStarting web server at http://{host}:{port}/")
     print("Press Ctrl+C to stop.\n")
     app.run(host=host, port=port)
+    vectorizer, doc_matrix = build_article_index(articles)
 
 
 if __name__ == "__main__":
