@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>General Network Troubleshooting</title>
+  <style>body { font-family: Arial, sans-serif; }</style>
+  <script>/* analytics placeholder */</script>
+</head>
+<body>
+<header><a href="/">Knowledge Base</a></header>
+<nav><ul><li><a href="/kb">Home</a></li></ul></nav>
+
+<aside class="doc-attr">
+  <span class="doc-attr-id">KBDoc: 67890</span>
+  <span class="doc-attr-owner">Network Services</span>
+  <span class="doc-attr-updated">2024-07-15</span>
+</aside>
+
+<main>
+  <h1>General Network Troubleshooting</h1>
+  <span id="kb-page-keywords">network, internet, connectivity, firewall, DNS, IP address, ping, traceroute, troubleshooting</span>
+
+  <div class="kb-class-internal-site">
+    <strong>[Internal Staff Note]</strong>
+    Network status dashboard: status.network.university.edu.
+    For reported outages affecting multiple users, open a P1 ticket and page the on-call Network engineer.
+    Port 443 and 80 must be open for all university systems; ports 1194 (OpenVPN) and 443 (AnyConnect) required for VPN.
+  </div>
+
+  <div id="kbcontent">
+    <h2>Overview</h2>
+    <p>This article provides general steps for diagnosing and resolving network connectivity issues
+    on campus and off campus. Try the steps in order, from simplest to most advanced.</p>
+
+    <h2>Step 1: Basic Checks</h2>
+    <ul>
+      <li>Confirm the device's Wi-Fi or Ethernet is enabled and connected.</li>
+      <li>Restart the device's network adapter: on Windows use <code>ipconfig /release</code> then <code>ipconfig /renew</code>; on macOS toggle the network interface off and on in System Preferences.</li>
+      <li>Try a different website or service to determine whether the issue is isolated to one site.</li>
+    </ul>
+
+    <h2>Step 2: Router and Modem (Off-Campus Users)</h2>
+    <ul>
+      <li>Power-cycle your home router and modem: unplug them, wait 30 seconds, then plug them back in (modem first, then router).</li>
+      <li>Connect another device to the same network to determine if the issue is device-specific or network-wide.</li>
+      <li>If the issue is network-wide, contact your ISP.</li>
+    </ul>
+
+    <h2>Step 3: DNS Troubleshooting</h2>
+    <ul>
+      <li>Try accessing a site by IP address to rule out DNS issues (e.g., <code>http://8.8.8.8</code>).</li>
+      <li>Flush DNS cache: Windows: <code>ipconfig /flushdns</code>; macOS: <code>sudo dscacheutil -flushcache</code>.</li>
+      <li>Temporarily switch DNS servers to 8.8.8.8 (Google) or 1.1.1.1 (Cloudflare) to test.</li>
+    </ul>
+
+    <h2>Step 4: Firewall and Antivirus</h2>
+    <ul>
+      <li>Temporarily disable any third-party firewall or antivirus to check if it is blocking connectivity.</li>
+      <li>If disabling the firewall resolves the issue, add the relevant university hostnames as trusted sites rather than leaving the firewall off.</li>
+      <li>Check Windows Defender Firewall settings: Control Panel → Windows Defender Firewall → Allow an app through the firewall.</li>
+    </ul>
+
+    <h2>Step 5: Diagnostic Commands</h2>
+    <ul>
+      <li><strong>Ping:</strong> <code>ping university.edu</code> — checks basic connectivity and latency.</li>
+      <li><strong>Traceroute:</strong> <code>tracert university.edu</code> (Windows) or <code>traceroute university.edu</code> (macOS/Linux) — identifies where packets are being dropped.</li>
+      <li><strong>NSLookup:</strong> <code>nslookup university.edu</code> — checks DNS resolution.</li>
+    </ul>
+
+    <h2>Checking for Known Outages</h2>
+    <p>Before spending time troubleshooting, check the university network status page at
+    <em>status.network.university.edu</em> to see if a known outage is affecting services.</p>
+
+    <h2>Contact</h2>
+    <p>If none of the above steps resolve the issue, contact the Help Desk at <em>help@university.edu</em>
+    or call 555-0100, providing the output of your ping and traceroute commands.</p>
+  </div>
+</main>
+
+<footer>University Help Desk &copy; 2024</footer>
+<button class="feedback-btn">Was this helpful?</button>
+<script>/* feedback analytics */</script>
+</body>
+</html>
