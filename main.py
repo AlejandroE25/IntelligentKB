@@ -396,235 +396,146 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    :root {
-      --green:  #33ff33;
-      --green2: #00cc00;
-      --amber:  #ffaa00;
-      --dim:    #1a5c1a;
-      --bg:     #0d0d0d;
-      --bg2:    #111111;
-      --border: #225522;
-    }
-
     body {
-      font-family: "Courier New", Courier, monospace;
-      background: var(--bg);
-      color: var(--green);
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      color: #222;
       display: flex;
       flex-direction: column;
       height: 100vh;
       overflow: hidden;
     }
 
-    /* scanline flicker overlay */
-    body::after {
-      content: "";
-      position: fixed;
-      inset: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        rgba(0,0,0,0.07) 0px,
-        rgba(0,0,0,0.07) 1px,
-        transparent 1px,
-        transparent 3px
-      );
-      pointer-events: none;
-      z-index: 999;
-    }
-
-    /* ── HEADER ── */
     header {
-      background: var(--bg2);
-      border-bottom: 2px solid var(--green2);
-      padding: 6px 12px;
+      background: #fff;
+      border-bottom: 1px solid #ccc;
+      padding: 8px 12px;
       flex-shrink: 0;
-    }
-    .hdr-top {
       display: flex;
-      align-items: baseline;
+      align-items: center;
       justify-content: space-between;
-      gap: 8px;
     }
     header h1 {
       font-size: 1rem;
       font-weight: bold;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--green);
-      text-shadow: 0 0 8px var(--green2);
     }
     header a {
-      color: var(--amber);
-      font-size: 0.75rem;
+      color: #0066cc;
+      font-size: 0.85rem;
       text-decoration: none;
-      border: 1px solid var(--amber);
-      padding: 2px 8px;
-      letter-spacing: 1px;
-      text-transform: uppercase;
     }
-    header a:hover { background: var(--amber); color: #000; }
-    .hdr-rule {
-      font-size: 0.65rem;
-      color: var(--dim);
-      letter-spacing: 1px;
-      margin-top: 3px;
-      user-select: none;
-    }
+    header a:hover { text-decoration: underline; }
 
-    /* ── TRANSCRIPT ── */
     #chat {
       flex: 1;
       overflow-y: auto;
       padding: 10px 14px;
       display: flex;
       flex-direction: column;
-      gap: 0;
+      gap: 8px;
     }
-    /* custom scrollbar */
-    #chat::-webkit-scrollbar { width: 8px; }
-    #chat::-webkit-scrollbar-track { background: var(--bg); }
-    #chat::-webkit-scrollbar-thumb { background: var(--green2); }
 
-    .entry { margin-bottom: 10px; }
+    .entry { max-width: 100%; }
 
     .entry-label {
-      font-size: 0.7rem;
-      letter-spacing: 2px;
-      text-transform: uppercase;
+      font-size: 0.75rem;
+      color: #666;
       margin-bottom: 2px;
     }
-    .entry.user   .entry-label { color: var(--amber); }
-    .entry.assistant .entry-label { color: var(--green2); }
-    .entry.error  .entry-label { color: #ff3333; }
 
     .entry-body {
       white-space: pre-wrap;
       word-wrap: break-word;
-      line-height: 1.55;
+      line-height: 1.5;
       font-size: 0.9rem;
       padding: 6px 10px;
-      border-left: 3px solid;
+      border: 1px solid #ccc;
+      background: #fff;
     }
-    .entry.user      .entry-body { border-color: var(--amber);  color: #ffd080; }
-    .entry.assistant .entry-body { border-color: var(--green2); color: var(--green); }
-    .entry.error     .entry-body { border-color: #ff3333; color: #ff6666; }
+    .entry.user .entry-body {
+      background: #eef4ff;
+      border-color: #aac4e8;
+    }
+    .entry.error .entry-body {
+      background: #fff0f0;
+      border-color: #e8aaaa;
+      color: #c00;
+    }
 
-    .entry.assistant .entry-body a {
-      color: var(--amber);
-      text-decoration: underline;
-    }
-    .entry.assistant .entry-body a:hover { color: #fff; }
+    .entry.assistant .entry-body a { color: #0066cc; }
+    .entry.assistant .entry-body a:hover { text-decoration: underline; }
 
     .empty-state {
-      color: var(--dim);
-      font-size: 0.85rem;
-      letter-spacing: 1px;
+      color: #888;
+      font-size: 0.9rem;
       margin: auto;
       text-align: center;
     }
-    .cursor { animation: blink 1s step-end infinite; }
-    @keyframes blink { 50% { opacity: 0; } }
-    @media (prefers-reduced-motion: reduce) {
-      .cursor { animation: none; }
-    }
 
-    /* ── FOOTER / INPUT ── */
     footer {
-      background: var(--bg2);
-      border-top: 2px solid var(--green2);
+      background: #fff;
+      border-top: 1px solid #ccc;
       padding: 8px 12px;
       flex-shrink: 0;
-    }
-    .prompt-line {
-      font-size: 0.7rem;
-      color: var(--dim);
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      margin-bottom: 4px;
     }
     form { display: flex; gap: 8px; align-items: flex-end; }
     textarea {
       flex: 1;
-      background: #000;
-      color: var(--green);
-      border: 1px solid var(--green2);
+      border: 1px solid #ccc;
       padding: 6px 10px;
       font-family: inherit;
       font-size: 0.9rem;
       resize: none;
       height: 42px;
       line-height: 1.45;
-      caret-color: var(--green);
-      outline: none;
     }
-    textarea::placeholder { color: var(--dim); }
-    textarea:focus { border-color: var(--green); box-shadow: 0 0 6px var(--green2); }
+    textarea:focus { outline: none; border-color: #0066cc; }
     button[type=submit] {
-      background: #000;
-      color: var(--green);
-      border: 1px solid var(--green2);
+      background: #0066cc;
+      color: #fff;
+      border: none;
       font-family: inherit;
-      font-size: 0.85rem;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      padding: 0 14px;
+      font-size: 0.9rem;
+      padding: 0 16px;
       height: 42px;
       cursor: pointer;
       white-space: nowrap;
     }
-    button[type=submit]:hover {
-      background: var(--green2);
-      color: #000;
-      box-shadow: 0 0 8px var(--green2);
-    }
+    button[type=submit]:hover { background: #0055aa; }
+    button[type=submit]:disabled { background: #999; cursor: default; }
   </style>
 </head>
 <body>
   <header>
-    <div class="hdr-top">
-      <h1><span aria-hidden="true">&#x25A0;</span> KB AI Search Agent v1.0</h1>
-      <a href="/clear">[NEW SESSION]</a>
-    </div>
-    <div class="hdr-rule">
-      &gt;&gt; HELP DESK KNOWLEDGE BASE TERMINAL &lt;&lt;
-      &nbsp;&nbsp;///&nbsp;&nbsp;
-      TYPE QUERY. PRESS ENTER.
-    </div>
+    <h1>KB AI Search Agent</h1>
+    <a href="/clear">New Session</a>
   </header>
 
   <div id="chat">
     {% if not conversation %}
-      <p class="empty-state">
-        C:\\HELPDESK&gt; _<span class="cursor" aria-hidden="true">&#x2588;</span><br><br>
-        SYSTEM READY. ENTER SUPPORT ISSUE BELOW.
-      </p>
+      <p class="empty-state">Enter a support question below to get started.</p>
     {% endif %}
     {% for msg in conversation %}
       <div class="entry {{ msg.role }}">
         <div class="entry-label">
-          {% if msg.role == 'user' %}
-            &gt;&gt; USER INPUT
-          {% else %}
-            &lt;&lt; KB AGENT
-          {% endif %}
+          {% if msg.role == 'user' %}You{% else %}KB Agent{% endif %}
         </div>
         <div class="entry-body">{{ msg.content }}</div>
       </div>
     {% endfor %}
     {% if error %}
       <div class="entry error">
-        <div class="entry-label">!! ERROR</div>
+        <div class="entry-label">Error</div>
         <div class="entry-body">{{ error }}</div>
       </div>
     {% endif %}
   </div>
 
   <footer>
-    <div class="prompt-line">C:\\HELPDESK&gt; enter query:</div>
     <form method="post" action="/">
       <textarea name="issue" placeholder="Describe the support issue..."
                 autofocus>{{ prefill }}</textarea>
-      <button type="submit">[SEND]</button>
+      <button type="submit">Send</button>
     </form>
   </footer>
 
@@ -652,7 +563,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       const userEntry = document.createElement('div');
       userEntry.className = 'entry user';
       userEntry.innerHTML =
-        '<div class="entry-label">&gt;&gt; USER INPUT</div>' +
+        '<div class="entry-label">You</div>' +
         '<div class="entry-body">' + escapeHtml(val) + '</div>';
       chat.appendChild(userEntry);
 
@@ -660,8 +571,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       const thinkingEntry = document.createElement('div');
       thinkingEntry.className = 'entry assistant';
       thinkingEntry.innerHTML =
-        '<div class="entry-label">&lt;&lt; KB AGENT</div>' +
-        '<div class="entry-body" style="color:var(--dim)">PROCESSING<span class="cursor">&#x2588;</span></div>';
+        '<div class="entry-label">KB Agent</div>' +
+        '<div class="entry-body" style="color:#888">Processing...</div>';
       chat.appendChild(thinkingEntry);
 
       chat.scrollTop = chat.scrollHeight;
