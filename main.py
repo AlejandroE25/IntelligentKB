@@ -1,7 +1,7 @@
 """
 KB AI Search Agent
 ==================
-A locally-run CLI tool where a help desk consultant describes a support problem
+A locally-run web app where a help desk consultant describes a support problem
 in plain English and receives relevant troubleshooting steps drawn from local KB
 articles. All article content is loaded directly into Claude's context window.
 """
@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import os
 import re
+import secrets
 import sys
 from pathlib import Path
 
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import anthropic
+from flask import Flask, redirect, render_template_string, request, session, url_for
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -130,47 +132,142 @@ def build_system_prompt(articles: list[dict[str, str]]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# CLI Loop
+# Web Application
 # ---------------------------------------------------------------------------
 
-def run_cli(client: anthropic.Anthropic, system_prompt: str) -> None:
-    """Run the interactive support query loop."""
-    conversation: list[dict[str, str]] = []
+HTML_TEMPLATE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KB AI Search Agent</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: #f4f4f4; display: flex;
+           flex-direction: column; height: 100vh; }
+    header { background: #1a73e8; color: white; padding: 12px 20px;
+             display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 1.1rem; }
+    header a { color: white; font-size: 0.85rem; text-decoration: none;
+               border: 1px solid rgba(255,255,255,0.6); padding: 4px 10px;
+               border-radius: 4px; }
+    header a:hover { background: rgba(255,255,255,0.15); }
+    #chat { flex: 1; overflow-y: auto; padding: 16px; display: flex;
+            flex-direction: column; gap: 12px; }
+    .msg { max-width: 80%; padding: 10px 14px; border-radius: 8px;
+           line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+    .msg.user { background: #1a73e8; color: white; align-self: flex-end; }
+    .msg.assistant { background: white; border: 1px solid #ddd;
+                     align-self: flex-start; }
+    .msg.assistant a { color: #1a73e8; }
+    .msg.error { background: #fdecea; border: 1px solid #f5c6cb;
+                 color: #721c24; align-self: flex-start; }
+    footer { background: white; border-top: 1px solid #ddd; padding: 12px 16px; }
+    form { display: flex; gap: 8px; }
+    textarea { flex: 1; padding: 8px 12px; border: 1px solid #ccc;
+               border-radius: 6px; resize: none; font-size: 0.95rem;
+               font-family: inherit; height: 44px; line-height: 1.4; }
+    textarea:focus { outline: none; border-color: #1a73e8; }
+    button[type=submit] { background: #1a73e8; color: white; border: none;
+                          border-radius: 6px; padding: 0 18px; font-size: 0.95rem;
+                          cursor: pointer; white-space: nowrap; }
+    button[type=submit]:hover { background: #1558b0; }
+    .empty-state { color: #888; text-align: center; margin: auto;
+                   font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>KB AI Search Agent</h1>
+    <a href="/clear">New Conversation</a>
+  </header>
+  <div id="chat">
+    {% if not conversation %}
+      <p class="empty-state">Describe a support issue and press Enter (or click Send).</p>
+    {% endif %}
+    {% for msg in conversation %}
+      <div class="msg {{ msg.role }}">{{ msg.content }}</div>
+    {% endfor %}
+    {% if error %}
+      <div class="msg error">{{ error }}</div>
+    {% endif %}
+  </div>
+  <footer>
+    <form method="post" action="/">
+      <textarea name="issue" placeholder="Describe the support issue…"
+                autofocus>{{ prefill }}</textarea>
+      <button type="submit">Send</button>
+    </form>
+  </footer>
+  <script>
+    // Auto-scroll to bottom on load
+    const chat = document.getElementById('chat');
+    chat.scrollTop = chat.scrollHeight;
+    // Enter submits the form; Shift+Enter inserts a newline
+    const ta = document.querySelector('textarea');
+    ta.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        ta.closest('form').submit();
+      }
+    });
+  </script>
+</body>
+</html>
+"""
 
-    print("KB AI Search Agent — type your support issue and press Enter.")
-    print("Type 'quit' or 'exit' to stop.\n")
 
-    while True:
-        try:
-            user_input = input("Enter your support issue: ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nGoodbye!")
-            break
+def create_app(client: anthropic.Anthropic, system_prompt: str) -> Flask:
+    """Create and configure the Flask application."""
+    app = Flask(__name__)
+    app.secret_key = secrets.token_hex(32)
 
-        if not user_input:
-            continue
-        if user_input.lower() in {"quit", "exit"}:
-            print("Goodbye!")
-            break
+    @app.route("/", methods=["GET", "POST"])
+    def index():
+        if "conversation" not in session:
+            session["conversation"] = []
 
-        conversation.append({"role": "user", "content": user_input})
+        error = ""
+        prefill = ""
 
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=MAX_TOKENS,
-            system=system_prompt,
-            messages=conversation,
+        if request.method == "POST":
+            user_input = request.form.get("issue", "").strip()
+            if user_input:
+                conversation = session["conversation"]
+                conversation.append({"role": "user", "content": user_input})
+
+                response = client.messages.create(
+                    model=MODEL,
+                    max_tokens=MAX_TOKENS,
+                    system=system_prompt,
+                    messages=conversation,
+                )
+
+                content_blocks = [b for b in response.content if hasattr(b, "text")]
+                if content_blocks:
+                    assistant_message = content_blocks[0].text
+                    conversation.append({"role": "assistant", "content": assistant_message})
+                else:
+                    conversation.pop()  # remove the unanswered user turn
+                    error = "No text response received from the assistant."
+                    prefill = user_input
+
+                session["conversation"] = conversation
+                session.modified = True
+
+        return render_template_string(
+            HTML_TEMPLATE,
+            conversation=session.get("conversation", []),
+            error=error,
+            prefill=prefill,
         )
 
-        content_blocks = [b for b in response.content if hasattr(b, "text")]
-        if not content_blocks:
-            print("(No text response received from the assistant.)\n")
-            conversation.pop()  # remove the user turn so history stays consistent
-            continue
-        assistant_message = content_blocks[0].text
-        conversation.append({"role": "assistant", "content": assistant_message})
+    @app.route("/clear")
+    def clear():
+        session.pop("conversation", None)
+        return redirect(url_for("index"))
 
-        print(f"\n{assistant_message}\n")
+    return app
 
 
 # ---------------------------------------------------------------------------
@@ -207,12 +304,19 @@ def main() -> None:
         )
         sys.exit(1)
 
-    print(f"Loaded {len(articles)} KB article(s): \n    {'\n    '.join(a['filename'] for a in articles)}")
+    print(f"Loaded {len(articles)} KB article(s):")
+    for a in articles:
+        print(f"    {a['filename']}")
 
     system_prompt = build_system_prompt(articles)
-
     client = anthropic.Anthropic(api_key=api_key)
-    run_cli(client, system_prompt)
+    app = create_app(client, system_prompt)
+
+    host = os.environ.get("HOST", "127.0.0.1")
+    port = int(os.environ.get("PORT", "5000"))
+    print(f"\nStarting web server at http://{host}:{port}/")
+    print("Press Ctrl+C to stop.\n")
+    app.run(host=host, port=port)
 
 
 if __name__ == "__main__":
