@@ -445,8 +445,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 """
 
 
-def create_app(client: anthropic.Anthropic, system_prompt: str) -> Flask:
-    """Create and configure the Flask application."""
+def create_app(
+    client: anthropic.Anthropic,
+    articles: list[dict[str, str]],
+    vectorizer: TfidfVectorizer,
+    doc_matrix: np.ndarray,
+) -> Flask:
+    """Create and configure the Flask application.
+
+    For each incoming query the TF-IDF index is used to select only the most
+    relevant articles before building the system prompt, keeping context size
+    small and reducing API cost.
+    """
     app = Flask(__name__)
     app.secret_key = secrets.token_hex(32)
 
@@ -463,6 +473,10 @@ def create_app(client: anthropic.Anthropic, system_prompt: str) -> Flask:
             if user_input:
                 conversation = session["conversation"]
                 conversation.append({"role": "user", "content": user_input})
+
+                # Select only the most relevant articles for this query.
+                relevant = select_relevant_articles(user_input, articles, vectorizer, doc_matrix)
+                system_prompt = build_system_prompt(relevant)
 
                 response = client.messages.create(
                     model=MODEL,
@@ -488,47 +502,6 @@ def create_app(client: anthropic.Anthropic, system_prompt: str) -> Flask:
             conversation=session.get("conversation", []),
             error=error,
             prefill=prefill,
-def run_cli(
-    client: anthropic.Anthropic,
-    articles: list[dict[str, str]],
-    vectorizer: TfidfVectorizer,
-    doc_matrix: np.ndarray,
-) -> None:
-    """Run the interactive support query loop.
-
-    For each user query, TF-IDF cosine similarity is used to select the
-    most relevant articles before building the system prompt, so that only
-    a small subset of the KB is sent to Claude rather than the full corpus.
-    """
-    conversation: list[dict[str, str]] = []
-
-    print("KB AI Search Agent — type your support issue and press Enter.")
-    print("Type 'quit' or 'exit' to stop.\n")
-
-    while True:
-        try:
-            user_input = input("Enter your support issue: ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nGoodbye!")
-            break
-
-        if not user_input:
-            continue
-        if user_input.lower() in {"quit", "exit"}:
-            print("Goodbye!")
-            break
-
-        # Select only the most relevant articles for this query.
-        relevant = select_relevant_articles(user_input, articles, vectorizer, doc_matrix)
-        system_prompt = build_system_prompt(relevant)
-
-        conversation.append({"role": "user", "content": user_input})
-
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=MAX_TOKENS,
-            system=system_prompt,
-            messages=conversation,
         )
 
     @app.route("/clear")
@@ -577,16 +550,15 @@ def main() -> None:
     for a in articles:
         print(f"    {a['filename']}")
 
-    system_prompt = build_system_prompt(articles)
+    vectorizer, doc_matrix = build_article_index(articles)
     client = anthropic.Anthropic(api_key=api_key)
-    app = create_app(client, system_prompt)
+    app = create_app(client, articles, vectorizer, doc_matrix)
 
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "5000"))
     print(f"\nStarting web server at http://{host}:{port}/")
     print("Press Ctrl+C to stop.\n")
     app.run(host=host, port=port)
-    vectorizer, doc_matrix = build_article_index(articles)
 
 
 if __name__ == "__main__":
