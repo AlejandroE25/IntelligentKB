@@ -632,13 +632,58 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     // Auto-scroll to bottom on load
     const chat = document.getElementById('chat');
     chat.scrollTop = chat.scrollHeight;
-    // Enter submits the form; Shift+Enter inserts a newline
+
     const ta = document.querySelector('textarea');
+    const form = ta.closest('form');
+
+    function escapeHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function submitQuery() {
+      const val = ta.value.trim();
+      if (!val) return;
+
+      // Remove empty state placeholder if present
+      const emptyState = chat.querySelector('.empty-state');
+      if (emptyState) emptyState.remove();
+
+      // Optimistically append the user message
+      const userEntry = document.createElement('div');
+      userEntry.className = 'entry user';
+      userEntry.innerHTML =
+        '<div class="entry-label">&gt;&gt; USER INPUT</div>' +
+        '<div class="entry-body">' + escapeHtml(val) + '</div>';
+      chat.appendChild(userEntry);
+
+      // Append a "processing" indicator
+      const thinkingEntry = document.createElement('div');
+      thinkingEntry.className = 'entry assistant';
+      thinkingEntry.innerHTML =
+        '<div class="entry-label">&lt;&lt; KB AGENT</div>' +
+        '<div class="entry-body" style="color:var(--dim)">PROCESSING<span class="cursor">&#x2588;</span></div>';
+      chat.appendChild(thinkingEntry);
+
+      chat.scrollTop = chat.scrollHeight;
+
+      // Disable input while waiting
+      ta.disabled = true;
+      document.querySelector('button[type=submit]').disabled = true;
+
+      form.submit();
+    }
+
+    // Enter submits; Shift+Enter inserts newline
     ta.addEventListener('keydown', function(e) {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        ta.closest('form').submit();
+        submitQuery();
       }
+    });
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      submitQuery();
     });
   </script>
 </body>
