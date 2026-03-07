@@ -9,6 +9,7 @@ articles. All article content is loaded directly into Claude's context window.
 from __future__ import annotations
 
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -23,11 +24,15 @@ ARTICLES_DIR = Path(__file__).parent / "articles"
 MODEL = "claude-sonnet-4-20250514"
 MAX_TOKENS = 1024
 
+KB_BASE_URL = "https://answers.uillinois.edu/illinois/internal"
+
 SYSTEM_PROMPT_HEADER = (
     "You are a help desk assistant. Below are the contents of our Knowledge Base articles.\n"
     "When given a support issue, provide concise troubleshooting steps using only the\n"
-    "information in these articles. Cite the source article for each step. If the articles\n"
-    "don't contain enough information to fully resolve the issue, say so.\n"
+    "information in these articles. Cite the source article for each step using a markdown\n"
+    f"clickable link in the format [Article XXXXX]({KB_BASE_URL}/XXXXX) where XXXXX is the\n"
+    "article number. If the articles don't contain enough information to fully resolve the\n"
+    "issue, say so.\n"
 )
 
 
@@ -62,7 +67,13 @@ def parse_article(path: Path) -> dict[str, str]:
         internal_text = internal_div.get_text(separator="\n", strip=True)
         internal_div.decompose()
 
-    # 3. Extract title
+    # 3. Extract article ID from the "Show changes" link (resultc.php?action=7&id=XXXXX)
+    article_id = ""
+    id_match = re.search(r'resultc\.php\?action=7&(?:amp;)?id=(\d+)', html)
+    if id_match:
+        article_id = id_match.group(1)
+
+    # 4. Extract title
     title_tag = soup.find("title")
     title = title_tag.text.strip() if title_tag else path.stem
 
@@ -81,6 +92,7 @@ def parse_article(path: Path) -> dict[str, str]:
 
     return {
         "filename": path.name,
+        "article_id": article_id,
         "title": title,
         "keywords": keywords,
         "content": content,
@@ -105,7 +117,10 @@ def build_system_prompt(articles: list[dict[str, str]]) -> str:
     """Construct the full system prompt with all KB article content."""
     lines = [SYSTEM_PROMPT_HEADER, "", "--- KNOWLEDGE BASE ---", ""]
     for article in articles:
-        lines.append(f"[ARTICLE: {article['filename']}]")
+        article_id = article["article_id"]
+        article_url = f"{KB_BASE_URL}/{article_id}" if article_id else ""
+        label = f"Article {article_id} ({article_url})" if article_id else article["filename"]
+        lines.append(f"[ARTICLE: {label}]")
         if article["keywords"]:
             lines.append(f"Keywords: {article['keywords']}")
         lines.append("---")
@@ -192,7 +207,7 @@ def main() -> None:
         )
         sys.exit(1)
 
-    print(f"Loaded {len(articles)} KB article(s): {', '.join(a['filename'] for a in articles)}")
+    print(f"Loaded {len(articles)} KB article(s): \n    {'\n    '.join(a['filename'] for a in articles)}")
 
     system_prompt = build_system_prompt(articles)
 
