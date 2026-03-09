@@ -615,11 +615,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
       chat.scrollTop = chat.scrollHeight;
 
-      // Disable input while waiting
+      // Submit the form before disabling the textarea so the value is
+      // included in the POST body (disabled fields are excluded by browsers).
+      form.submit();
+
+      // Disable input while waiting for the server response.
       ta.disabled = true;
       document.querySelector('button[type=submit]').disabled = true;
-
-      form.submit();
     }
 
     // Enter submits; Shift+Enter inserts newline
