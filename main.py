@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import anthropic
-from flask import Flask, redirect, render_template_string, request, session, url_for
+from flask import Flask, render_template_string, request
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -36,10 +36,17 @@ MAX_TOKENS = 2048
 # Raising this improves recall at the cost of larger context windows.
 TOP_K_ARTICLES = 3
 
+# Number of articles shown in the left search-results panel (independent of TOP_K_ARTICLES).
+DISPLAY_K_ARTICLES = 5
+
 KB_BASE_URL = "https://answers.uillinois.edu/illinois/internal"
 
 # Articles last updated more than this many years ago are flagged as potentially stale.
 STALE_ARTICLE_YEARS = 2
+
+# TF-IDF cosine similarity thresholds for relevancy labels shown in the left panel.
+RELEVANCE_HIGH = 0.20
+RELEVANCE_MEDIUM = 0.08
 
 SYSTEM_PROMPT_HEADER = (
     "You are a help desk assistant for University of Illinois Technology Services.\n"
@@ -59,7 +66,7 @@ SYSTEM_PROMPT_HEADER = (
     "## Rules\n"
     "- Use only information from the provided KB articles. Do not add general knowledge.\n"
     "- Use plain language, but preserve exact names of systems, tools, buttons, and settings as written in the articles.\n"
-    "- Reference prior messages in the conversation to avoid repeating information already covered.\n"
+    "- Each response is independent; do not assume any prior context.\n"
     f"- If an article was last updated more than {STALE_ARTICLE_YEARS} years ago, note it inline "
     "(e.g., 'Note: this article was last updated in YYYY - verify these steps are still current.').\n"
     "- If articles conflict, prefer the more recently updated one and note the discrepancy.\n"
@@ -273,6 +280,29 @@ def select_relevant_articles(
     return [articles[i] for i in top_indices]
 
 
+def select_display_articles(
+    query: str,
+    articles: list[dict[str, str]],
+    vectorizer: TfidfVectorizer,
+    doc_matrix: np.ndarray,
+    display_k: int = DISPLAY_K_ARTICLES,
+) -> list[tuple[dict[str, str], float]]:
+    """Return the top *display_k* articles with their raw cosine similarity scores.
+
+    Returns a list of ``(article, score)`` tuples ordered by relevance descending.
+    Falls back to all articles (with score 0.0) when the query produces an
+    all-zero vector (e.g. only stop-words).
+    """
+    query_vec = vectorizer.transform([query])
+    scores = cosine_similarity(query_vec, doc_matrix).flatten()
+
+    if not np.any(scores):
+        return [(a, 0.0) for a in articles[:display_k]]
+
+    top_indices = np.argsort(scores)[::-1][: min(display_k, len(articles))]
+    return [(articles[i], float(scores[i])) for i in top_indices]
+
+
 def build_system_prompt(articles: list[dict[str, str]], contacts_text: str = "") -> str:
     """Construct the full system prompt with all KB article content."""
     lines = [SYSTEM_PROMPT_HEADER, "", "--- KNOWLEDGE BASE ---", ""]
@@ -392,8 +422,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KB AI Search Agent</title>
+  <title>KB AI Search</title>
   <style>
+    *, *::before, *::after { box-sizing: border-box; }
     body {
       font-family: Arial, Helvetica, sans-serif;
       font-size: 13px;
@@ -410,75 +441,84 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     /* ── HEADER ── */
     #page-header {
       background: #262626;
-      padding: 8px 12px 4px 12px;
-      text-align: center;
+      padding: 8px 12px;
       flex-shrink: 0;
       border-bottom: 2px solid #555;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
     #page-header h1 {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: bold;
       font-style: italic;
       color: #7aaee8;
-      margin: 0 0 4px 0;
-    }
-    #page-header .header-link {
-      float: right;
-      margin-top: -22px;
-    }
-    #page-header .header-link a {
-      color: #7aaee8;
-      font-style: italic;
-      font-size: 12px;
-    }
-    #page-header .header-link a:hover { text-decoration: underline; }
-    hr.rule {
-      border: none;
-      border-top: 1px solid #555;
       margin: 0;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    #search-form {
+      display: flex;
+      flex: 1;
+      gap: 6px;
+      align-items: center;
+    }
+    #search-input {
+      flex: 1;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 13px;
+      background: #1e1e1e;
+      color: #cccccc;
+      border: 2px inset #555;
+      padding: 4px 6px;
+      height: 30px;
+    }
+    #search-input:focus { outline: none; border-color: #7aaee8; }
+    .btn-submit {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 13px;
+      background: #3a3a3a;
+      color: #cccccc;
+      border: 2px outset #666;
+      padding: 3px 14px;
+      height: 30px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-submit:hover { background: #484848; }
+    .btn-submit:active { border-style: inset; }
+
+    /* ── TWO-COLUMN BODY ── */
+    #main-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
     }
 
-    /* ── CHAT TRANSCRIPT ── */
-    #chat {
+    /* ── LEFT PANEL ── */
+    #left-panel {
+      width: 50%;
+      border-right: 2px solid #555;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel-header {
+      background: #3c5070;
+      color: #fff;
+      font-weight: bold;
+      font-size: 12px;
+      padding: 3px 8px;
+      flex-shrink: 0;
+    }
+    #results-list {
       flex: 1;
       overflow-y: auto;
-      padding: 8px 12px;
+      padding: 8px;
       display: flex;
       flex-direction: column;
       gap: 6px;
     }
-
-    .entry { width: 100%; }
-
-    /* Section bar (like the gray record-details bars in the reference) */
-    .entry-label {
-      background: #3c5070;
-      color: #ffffff;
-      font-weight: bold;
-      font-size: 12px;
-      padding: 2px 6px;
-      border: 1px solid #506080;
-    }
-
-    .entry-body {
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      line-height: 1.5;
-      font-size: 13px;
-      padding: 5px 8px;
-      background: #2e2e2e;
-      border: 1px solid #444;
-      border-top: none;
-      color: #cccccc;
-    }
-    .entry.user .entry-label { background: #3a4a3a; border-color: #4a6050; }
-    .entry.user .entry-body  { background: #2a2e2a; border-color: #404840; color: #b8ccb8; }
-    .entry.error .entry-label { background: #4a2a2a; border-color: #6a3030; }
-    .entry.error .entry-body  { background: #2e2020; border-color: #503030; color: #d08080; }
-
-    .entry.assistant .entry-body a { color: #7aaee8; text-decoration: underline; }
-    .entry.assistant .entry-body a:hover { color: #aaccff; }
-
     .empty-state {
       color: #777;
       font-size: 13px;
@@ -487,156 +527,261 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       text-align: center;
     }
 
-    /* ── FOOTER / INPUT ── */
-    #page-footer {
-      background: #262626;
-      border-top: 2px solid #555;
-      padding: 6px 12px;
-      flex-shrink: 0;
-    }
-    #page-footer .section-bar {
-      background: #3c5070;
-      color: #fff;
-      font-weight: bold;
-      font-size: 12px;
-      padding: 2px 6px;
-      border: 1px solid #506080;
-      margin-bottom: 0;
-    }
-    #page-footer form {
-      display: flex;
-      gap: 6px;
-      align-items: flex-end;
+    /* Article result cards */
+    .result-card {
       background: #2e2e2e;
       border: 1px solid #444;
-      border-top: none;
-      padding: 6px;
+      padding: 6px 8px;
     }
-    textarea {
-      flex: 1;
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 13px;
-      background: #1e1e1e;
+    .result-card.not-in-ai {
+      border-color: #3a3a3a;
+      opacity: 0.75;
+    }
+    .card-title-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 6px;
+      margin-bottom: 2px;
+    }
+    .card-title {
+      font-weight: bold;
       color: #cccccc;
-      border: 2px inset #555;
-      padding: 3px 5px;
-      resize: none;
-      height: 40px;
+      text-decoration: none;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .card-title:hover { color: #aaccff; text-decoration: underline; }
+    .card-id {
+      color: #777;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    .relevancy-badge {
+      font-size: 11px;
+      font-weight: bold;
+      padding: 1px 5px;
+      border-radius: 2px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .badge-high   { background: #1a3a1a; color: #6ec86e; border: 1px solid #3a6a3a; }
+    .badge-medium { background: #3a3010; color: #c8b050; border: 1px solid #6a5020; }
+    .badge-low    { background: #2e2e2e; color: #888;    border: 1px solid #444; }
+    .card-meta {
+      color: #888;
+      font-size: 11px;
+      margin-bottom: 2px;
+    }
+    .stale-badge {
+      background: #3a2a10;
+      color: #c89040;
+      border: 1px solid #6a4a20;
+      font-size: 10px;
+      padding: 0 4px;
+      border-radius: 2px;
+      margin-left: 4px;
+    }
+    .card-keywords {
+      color: #999;
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 2px;
+    }
+    .card-excerpt {
+      color: #aaa;
+      font-size: 12px;
       line-height: 1.4;
     }
-    textarea:focus { outline: none; border-color: #7aaee8; }
-    button[type=submit] {
+    .not-in-ai-note {
+      color: #666;
+      font-size: 10px;
+      font-style: italic;
+      margin-top: 3px;
+    }
+
+    /* ── RIGHT PANEL ── */
+    #right-panel {
+      width: 50%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #ai-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+    }
+    #ai-body {
+      flex: 1;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      line-height: 1.5;
+      font-size: 13px;
+      color: #cccccc;
+    }
+    #ai-body a { color: #7aaee8; text-decoration: underline; }
+    #ai-body a:hover { color: #aaccff; }
+    .ai-loading {
+      color: #888;
+      font-style: italic;
+    }
+    .ai-error {
+      color: #d08080;
+    }
+    #ai-footer {
+      color: #777;
+      font-size: 11px;
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px solid #444;
+    }
+    #refine-area {
+      flex-shrink: 0;
+      padding: 6px 8px;
+      border-top: 1px solid #444;
+    }
+    #refine-form {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #refine-form label {
+      color: #999;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    #refine-input {
+      flex: 1;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 12px;
+      background: #1e1e1e;
+      color: #cccccc;
+      border: 1px inset #555;
+      padding: 3px 5px;
+      height: 26px;
+    }
+    #refine-input:focus { outline: none; border-color: #7aaee8; }
+    .btn-refine {
       font-family: Arial, Helvetica, sans-serif;
       font-size: 13px;
       background: #3a3a3a;
       color: #cccccc;
       border: 2px outset #666;
-      padding: 3px 14px;
-      height: 40px;
+      padding: 1px 8px;
+      height: 26px;
       cursor: pointer;
-      white-space: nowrap;
     }
-    button[type=submit]:hover { background: #484848; }
-    button[type=submit]:active { border-style: inset; }
-    button[type=submit]:disabled { color: #666; cursor: default; }
+    .btn-refine:hover { background: #484848; }
+    .btn-refine:active { border-style: inset; }
   </style>
 </head>
 <body>
+  <!-- HEADER -->
   <div id="page-header">
-    <div class="header-link"><a href="/clear">[ New Session ]</a></div>
-    <h1>KB AI Search Agent</h1>
-  </div>
-  <hr class="rule">
-
-  <div id="chat">
-    {% if not conversation %}
-      <p class="empty-state">Enter a support question below to get started.</p>
-    {% endif %}
-    {% for msg in conversation %}
-      <div class="entry {{ msg.role }}">
-        <div class="entry-label">
-          {% if msg.role == 'user' %}You:{% else %}KB Agent:{% endif %}
-        </div>
-        <div class="entry-body">{{ msg.content }}</div>
-      </div>
-    {% endfor %}
-    {% if error %}
-      <div class="entry error">
-        <div class="entry-label">Error:</div>
-        <div class="entry-body">{{ error }}</div>
-      </div>
-    {% endif %}
-  </div>
-
-  <div id="page-footer">
-    <div class="section-bar">Enter Query:</div>
-    <form method="post" action="/">
-      <textarea name="issue" placeholder="Describe the support issue..."
-                autofocus>{{ prefill }}</textarea>
-      <button type="submit">Send</button>
+    <h1>KB AI Search</h1>
+    <form id="search-form" method="post" action="/">
+      <input type="text" id="search-input" name="query"
+             value="{{ query | e }}"
+             placeholder="Describe the support issue..."
+             autofocus>
+      <button type="submit" class="btn-submit">Submit</button>
     </form>
   </div>
 
-  <script>
-    // Auto-scroll to bottom on load
-    const chat = document.getElementById('chat');
-    chat.scrollTop = chat.scrollHeight;
+  <!-- MAIN BODY -->
+  <div id="main-body">
 
-    const ta = document.querySelector('textarea');
-    const form = ta.closest('form');
+    <!-- LEFT: Search Results -->
+    <div id="left-panel">
+      <div class="panel-header">SEARCH RESULTS{% if display_articles is not none %} ({{ display_articles | length }} found){% endif %}</div>
+      <div id="results-list">
+        {% if display_articles is none %}
+          <p class="empty-state">Enter a support question above to get started.</p>
+        {% elif display_articles | length == 0 %}
+          <p class="empty-state">No articles found for this query.</p>
+        {% else %}
+          {% for article, score in display_articles %}
+            {% if score >= relevance_high %}
+              {% set badge_class = "badge-high" %}{% set badge_label = "High" %}
+            {% elif score >= relevance_medium %}
+              {% set badge_class = "badge-medium" %}{% set badge_label = "Medium" %}
+            {% else %}
+              {% set badge_class = "badge-low" %}{% set badge_label = "Low" %}
+            {% endif %}
+            {% set in_ai = loop.index0 < top_k %}
+            <div class="result-card{% if not in_ai %} not-in-ai{% endif %}">
+              <div class="card-title-row">
+                {% if article.article_id %}
+                  <a class="card-title" href="{{ kb_base_url }}/{{ article.article_id }}" target="_blank" title="{{ article.title }}">{{ article.title }}</a>
+                {% else %}
+                  <span class="card-title" title="{{ article.title }}">{{ article.title }}</span>
+                {% endif %}
+                <span class="card-id">#{{ article.article_id }}</span>
+                <span class="relevancy-badge {{ badge_class }}">{{ badge_label }}</span>
+              </div>
+              <div class="card-meta">
+                {% if article.owner %}{{ article.owner }}{% endif %}
+                {% if article.updated %} · Updated: {{ article.updated }}
+                  {% if article.updated | is_stale %}<span class="stale-badge">⚠ Last updated {{ article.updated[:4] }}</span>{% endif %}
+                {% endif %}
+              </div>
+              {% if article.keywords %}
+                <div class="card-keywords">Keywords: {{ article.keywords }}</div>
+              {% endif %}
+              {% if article.content %}
+                <div class="card-excerpt">{{ article.content[:200] }}{% if article.content | length > 200 %}…{% endif %}</div>
+              {% endif %}
+              {% if not in_ai %}
+                <div class="not-in-ai-note">Not included in AI response</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        {% endif %}
+      </div>
+    </div>
 
-    function escapeHtml(str) {
-      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    }
+    <!-- RIGHT: AI Troubleshooting -->
+    <div id="right-panel">
+      <div class="panel-header">AI TROUBLESHOOTING</div>
+      <div id="ai-content">
+        {% if ai_response is none and display_articles is none %}
+          <p class="empty-state">AI troubleshooting steps will appear here after a search.</p>
+        {% elif ai_error %}
+          <div id="ai-body" class="ai-error">{{ ai_error }}</div>
+        {% elif ai_response %}
+          <div id="ai-body">{{ ai_response | e }}</div>
+          {% if ai_footer %}
+            <div id="ai-footer">{{ ai_footer }}</div>
+          {% endif %}
+        {% else %}
+          <p class="empty-state">No response received.</p>
+        {% endif %}
+      </div>
+      {% if ai_response and not ai_error %}
+        <div id="refine-area">
+          <form id="refine-form" method="post" action="/refine">
+            <input type="hidden" name="original_query" value="{{ query | e }}">
+            {% for article, score in (display_articles or []) %}
+              <input type="hidden" name="article_ids" value="{{ article.article_id }}">
+            {% endfor %}
+            <label for="refine-input">Refine:</label>
+            <input type="text" id="refine-input" name="refinement"
+                   placeholder="Add context or clarify...">
+            <button type="submit" class="btn-refine">→</button>
+          </form>
+        </div>
+      {% endif %}
+    </div>
 
-    function submitQuery() {
-      const val = ta.value.trim();
-      if (!val) return;
-
-      // Remove empty state placeholder if present
-      const emptyState = chat.querySelector('.empty-state');
-      if (emptyState) emptyState.remove();
-
-      // Optimistically append the user message
-      const userEntry = document.createElement('div');
-      userEntry.className = 'entry user';
-      userEntry.innerHTML =
-        '<div class="entry-label">You:</div>' +
-        '<div class="entry-body">' + escapeHtml(val) + '</div>';
-      chat.appendChild(userEntry);
-
-      // Append a "processing" indicator
-      const thinkingEntry = document.createElement('div');
-      thinkingEntry.className = 'entry assistant';
-      thinkingEntry.innerHTML =
-        '<div class="entry-label">KB Agent:</div>' +
-        '<div class="entry-body" style="color:#888">Processing...</div>';
-      chat.appendChild(thinkingEntry);
-
-      chat.scrollTop = chat.scrollHeight;
-
-      // Submit the form before disabling the textarea so the value is
-      // included in the POST body (disabled fields are excluded by browsers).
-      form.submit();
-
-      // Disable input while waiting for the server response.
-      ta.disabled = true;
-      document.querySelector('button[type=submit]').disabled = true;
-    }
-
-    // Enter submits; Shift+Enter inserts newline
-    ta.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        submitQuery();
-      }
-    });
-
-    form.addEventListener('submit', function(e) {
-      e.preventDefault();
-      submitQuery();
-    });
-  </script>
+  </div>
 </body>
 </html>
 """
@@ -651,68 +796,120 @@ def create_app(
 ) -> Flask:
     """Create and configure the Flask application.
 
-    For each incoming query the TF-IDF index is used to select only the most
-    relevant articles before building the system prompt, keeping context size
-    small and reducing API cost.  Claude may then fetch additional articles
-    mid-response via tool calls handled by the agentic loop.
+    For each incoming query the TF-IDF index is used to select:
+    - DISPLAY_K_ARTICLES articles for the left panel (with scores for relevancy labels)
+    - TOP_K_ARTICLES articles to pass to Claude for the right panel
+
+    Claude may fetch additional articles mid-response via tool calls handled
+    by the agentic loop.
     """
     app = Flask(__name__)
     app.secret_key = secrets.token_hex(32)
 
-    @app.route("/", methods=["GET", "POST"])
-    def index():
-        if "conversation" not in session:
-            session["conversation"] = []
+    def _is_stale_filter(updated: str) -> bool:
+        return _is_stale(updated)
 
-        error = ""
-        prefill = ""
+    app.jinja_env.filters["is_stale"] = _is_stale_filter
 
-        if request.method == "POST":
-            user_input = request.form.get("issue", "").strip()
-            if user_input:
-                conversation = session["conversation"]
-                conversation.append({"role": "user", "content": user_input})
-
-                # Select only the most relevant articles for this query.
-                relevant = select_relevant_articles(user_input, articles, vectorizer, doc_matrix)
-                system_prompt = build_system_prompt(relevant, contacts_text)
-
-                try:
-                    assistant_message = run_agent(
-                        client, system_prompt, conversation, articles, vectorizer, doc_matrix
-                    )
-                except anthropic.RateLimitError:
-                    conversation.pop()
-                    error = "Rate limit reached. The request was too large or too many requests were made in a short period. Please wait a moment and try again."
-                    prefill = user_input
-                    assistant_message = None
-                except anthropic.APIError as exc:
-                    conversation.pop()
-                    error = f"API error: {exc}"
-                    prefill = user_input
-                    assistant_message = None
-
-                if assistant_message:
-                    conversation.append({"role": "assistant", "content": assistant_message})
-                elif not error:
-                    conversation.pop()  # remove the unanswered user turn
-                    error = "No text response received from the assistant."
-                    prefill = user_input
-
-                session["conversation"] = conversation
-                session.modified = True
-
+    def _render(
+        query: str = "",
+        display_articles=None,
+        ai_response: str | None = None,
+        ai_footer: str = "",
+        ai_error: str = "",
+    ):
         return render_template_string(
             HTML_TEMPLATE,
-            conversation=session.get("conversation", []),
-            error=error,
-            prefill=prefill,
+            query=query,
+            display_articles=display_articles,
+            ai_response=ai_response,
+            ai_footer=ai_footer,
+            ai_error=ai_error,
+            top_k=TOP_K_ARTICLES,
+            relevance_high=RELEVANCE_HIGH,
+            relevance_medium=RELEVANCE_MEDIUM,
+            kb_base_url=KB_BASE_URL,
         )
 
-    @app.route("/clear")
-    def clear():
-        session.pop("conversation", None)
-        return redirect(url_for("index"))
+    def _run_claude(query: str, top_articles: list[dict[str, str]]) -> tuple[str | None, str, str]:
+        """Run Claude for the given query and top articles.
+
+        Returns ``(ai_response, ai_footer, ai_error)``.
+        """
+        system_prompt = build_system_prompt(top_articles, contacts_text)
+        messages = [{"role": "user", "content": query}]
+        ai_response = None
+        ai_footer = ""
+        ai_error = ""
+        try:
+            ai_response = run_agent(client, system_prompt, messages, articles, vectorizer, doc_matrix)
+            if ai_response is None:
+                ai_error = "No text response received from the assistant."
+            else:
+                # Build footer: count articles and find most recent date
+                n = len(top_articles)
+                dates = [a["updated"] for a in top_articles if a.get("updated")]
+                most_recent = max(dates) if dates else None
+                ai_footer = f"Generated from {n} article{'s' if n != 1 else ''}"
+                if most_recent:
+                    ai_footer += f" · Most recent: {most_recent}"
+        except anthropic.RateLimitError:
+            ai_error = (
+                "Rate limit reached. The request was too large or too many requests were "
+                "made in a short period. Please wait a moment and try again."
+            )
+        except anthropic.APIError as exc:
+            ai_error = f"API error: {exc}"
+        return ai_response, ai_footer, ai_error
+
+    @app.route("/", methods=["GET", "POST"])
+    def index():
+        if request.method == "GET":
+            return _render()
+
+        query = request.form.get("query", "").strip()
+        if not query:
+            return _render()
+
+        # Select articles for both panels in one pass
+        display = select_display_articles(query, articles, vectorizer, doc_matrix)
+        top_articles = [a for a, _ in display[:TOP_K_ARTICLES]]
+
+        ai_response, ai_footer, ai_error = _run_claude(query, top_articles)
+        return _render(
+            query=query,
+            display_articles=display,
+            ai_response=ai_response,
+            ai_footer=ai_footer,
+            ai_error=ai_error,
+        )
+
+    @app.route("/refine", methods=["POST"])
+    def refine():
+        original_query = request.form.get("original_query", "").strip()
+        refinement = request.form.get("refinement", "").strip()
+
+        if not original_query:
+            return _render()
+
+        # Re-compute display articles from the original query (left panel unchanged)
+        display = select_display_articles(original_query, articles, vectorizer, doc_matrix)
+        top_articles = [a for a, _ in display[:TOP_K_ARTICLES]]
+
+        # Build combined prompt for Claude
+        if refinement:
+            combined_query = f"[Original query]: {original_query} / [Refinement]: {refinement}"
+        else:
+            combined_query = original_query
+
+        ai_response, ai_footer, ai_error = _run_claude(combined_query, top_articles)
+        return _render(
+            query=original_query,
+            display_articles=display,
+            ai_response=ai_response,
+            ai_footer=ai_footer,
+            ai_error=ai_error,
+        )
 
     return app
 

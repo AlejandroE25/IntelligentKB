@@ -353,8 +353,63 @@ class TestSelectRelevantArticles:
 
 
 # ---------------------------------------------------------------------------
-# build_system_prompt
+# select_display_articles
 # ---------------------------------------------------------------------------
+
+class TestSelectDisplayArticles:
+    def _build(self, articles):
+        from main import build_article_index
+        return build_article_index(articles)
+
+    def test_returns_tuples_of_article_and_score(self):
+        from main import select_display_articles
+        articles = [
+            _make_mock_article("1", content="wifi wireless network IllinoisNet"),
+            _make_mock_article("2", content="VPN Cisco AnyConnect installation"),
+        ]
+        vectorizer, matrix = self._build(articles)
+        results = select_display_articles("wifi connection", articles, vectorizer, matrix, display_k=2)
+        assert len(results) == 2
+        for article, score in results:
+            assert isinstance(article, dict)
+            assert isinstance(score, float)
+
+    def test_most_relevant_ranked_first(self):
+        from main import select_display_articles
+        articles = [
+            _make_mock_article("1", content="VPN Cisco installation Windows macOS"),
+            _make_mock_article("2", content="wifi wireless IllinoisNet SecureW2 network"),
+        ]
+        vectorizer, matrix = self._build(articles)
+        results = select_display_articles("wifi IllinoisNet", articles, vectorizer, matrix, display_k=2)
+        assert results[0][0]["article_id"] == "2"
+
+    def test_scores_descending(self):
+        from main import select_display_articles
+        articles = [
+            _make_mock_article("1", content="wifi wireless network IllinoisNet"),
+            _make_mock_article("2", content="VPN Cisco AnyConnect installation"),
+            _make_mock_article("3", content="password reset NetID account"),
+        ]
+        vectorizer, matrix = self._build(articles)
+        results = select_display_articles("wifi IllinoisNet", articles, vectorizer, matrix, display_k=3)
+        scores = [score for _, score in results]
+        assert scores == sorted(scores, reverse=True)
+
+    def test_display_k_limits_results(self):
+        from main import select_display_articles
+        articles = [_make_mock_article(str(i), content=f"article {i} content topic") for i in range(6)]
+        vectorizer, matrix = self._build(articles)
+        results = select_display_articles("content topic", articles, vectorizer, matrix, display_k=3)
+        assert len(results) == 3
+
+    def test_fallback_on_zero_vector(self):
+        from main import select_display_articles
+        articles = [_make_mock_article("1"), _make_mock_article("2")]
+        vectorizer, matrix = self._build(articles)
+        results = select_display_articles("the and or", articles, vectorizer, matrix, display_k=5)
+        assert all(score == 0.0 for _, score in results)
+
 
 class TestBuildSystemPrompt:
     def test_contains_system_prompt_header(self):
@@ -621,44 +676,76 @@ class TestCreateApp:
             response = c.get("/")
             assert response.status_code == 200
 
-    def test_post_adds_user_and_assistant_to_conversation(self):
+    def test_post_shows_query_and_ai_response(self):
         app = self._make_app("Here are your steps.")
         with app.test_client() as c:
-            response = c.post("/", data={"issue": "My wifi is not working"})
+            response = c.post("/", data={"query": "My wifi is not working"})
             assert response.status_code == 200
             data = response.data.decode()
             assert "My wifi is not working" in data
             assert "Here are your steps." in data
 
-    def test_empty_post_does_not_add_to_conversation(self):
+    def test_empty_post_shows_empty_state(self):
         app = self._make_app()
         with app.test_client() as c:
-            c.post("/", data={"issue": "   "})
-            # Session conversation should remain empty
-            with c.session_transaction() as sess:
-                assert sess.get("conversation", []) == []
-
-    def test_post_missing_issue_field_does_not_add_to_conversation(self):
-        """Regression test: a POST with no 'issue' field (which browsers send
-        when the textarea is disabled at submission time) must not add anything
-        to the conversation.  Previously, the JS disabled the textarea *before*
-        calling form.submit(), so the field was excluded from the request body
-        and every query was silently dropped."""
-        app = self._make_app()
-        with app.test_client() as c:
-            response = c.post("/", data={})  # no 'issue' key at all
+            response = c.post("/", data={"query": "   "})
             assert response.status_code == 200
-            with c.session_transaction() as sess:
-                assert sess.get("conversation", []) == []
+            data = response.data.decode()
+            # No results shown — left panel should show the empty-state placeholder
+            assert "Enter a support question above to get started" in data
 
-    def test_clear_resets_conversation(self):
-        app = self._make_app("Answer.")
+    def test_post_missing_query_field_shows_empty_state(self):
+        """A POST with no 'query' field must not show any results."""
+        app = self._make_app()
         with app.test_client() as c:
-            c.post("/", data={"issue": "wifi issue"})
-            c.get("/clear")
+            response = c.post("/", data={})
+            assert response.status_code == 200
+            data = response.data.decode()
+            assert "Enter a support question above to get started" in data
+
+    def test_get_shows_empty_panels(self):
+        app = self._make_app()
+        with app.test_client() as c:
             response = c.get("/")
             data = response.data.decode()
-            assert "wifi issue" not in data
+            assert "Enter a support question above to get started" in data
+
+    def test_refine_returns_200(self):
+        app = self._make_app("Refined answer.")
+        with app.test_client() as c:
+            response = c.post("/refine", data={
+                "original_query": "wifi issue",
+                "refinement": "user is on macOS",
+            })
+            assert response.status_code == 200
+
+    def test_refine_shows_combined_response(self):
+        app = self._make_app("Refined answer.")
+        with app.test_client() as c:
+            response = c.post("/refine", data={
+                "original_query": "wifi issue",
+                "refinement": "user is on macOS",
+            })
+            data = response.data.decode()
+            assert "Refined answer." in data
+
+    def test_refine_preserves_original_query_in_search_bar(self):
+        app = self._make_app("Refined answer.")
+        with app.test_client() as c:
+            response = c.post("/refine", data={
+                "original_query": "wifi issue",
+                "refinement": "user is on macOS",
+            })
+            data = response.data.decode()
+            assert "wifi issue" in data
+
+    def test_refine_missing_original_query_shows_empty_state(self):
+        app = self._make_app()
+        with app.test_client() as c:
+            response = c.post("/refine", data={"refinement": "extra context"})
+            assert response.status_code == 200
+            data = response.data.decode()
+            assert "Enter a support question above to get started" in data
 
     def test_rate_limit_error_shows_error_message(self):
         from main import create_app, build_article_index
@@ -675,6 +762,6 @@ class TestCreateApp:
         app.config["TESTING"] = True
         app.config["SECRET_KEY"] = "test-secret"
         with app.test_client() as c:
-            response = c.post("/", data={"issue": "wifi issue"})
+            response = c.post("/", data={"query": "wifi issue"})
             data = response.data.decode()
             assert "Rate limit" in data or "rate limit" in data.lower()
