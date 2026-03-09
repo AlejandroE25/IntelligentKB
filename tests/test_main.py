@@ -638,6 +638,19 @@ class TestCreateApp:
             with c.session_transaction() as sess:
                 assert sess.get("conversation", []) == []
 
+    def test_post_missing_issue_field_does_not_add_to_conversation(self):
+        """Regression test: a POST with no 'issue' field (which browsers send
+        when the textarea is disabled at submission time) must not add anything
+        to the conversation.  Previously, the JS disabled the textarea *before*
+        calling form.submit(), so the field was excluded from the request body
+        and every query was silently dropped."""
+        app = self._make_app()
+        with app.test_client() as c:
+            response = c.post("/", data={})  # no 'issue' key at all
+            assert response.status_code == 200
+            with c.session_transaction() as sess:
+                assert sess.get("conversation", []) == []
+
     def test_clear_resets_conversation(self):
         app = self._make_app("Answer.")
         with app.test_client() as c:
