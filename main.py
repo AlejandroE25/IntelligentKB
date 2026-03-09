@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import anthropic
-from flask import Flask, render_template_string, request
+from flask import Flask, jsonify, render_template_string, request
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -701,7 +701,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
     <!-- LEFT: Search Results -->
     <div id="left-panel">
-      <div class="panel-header">SEARCH RESULTS{% if display_articles is not none %} ({{ display_articles | length }} found){% endif %}</div>
+      <div class="panel-header" id="results-header">SEARCH RESULTS{% if display_articles is not none %} ({{ display_articles | length }} found){% endif %}</div>
       <div id="results-list">
         {% if display_articles is none %}
           <p class="empty-state">Enter a support question above to get started.</p>
@@ -767,21 +767,161 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       </div>
       {% if ai_response and not ai_error %}
         <div id="refine-area">
+      {% else %}
+        <div id="refine-area" style="display:none">
+      {% endif %}
           <form id="refine-form" method="post" action="/refine">
             <input type="hidden" name="original_query" value="{{ query | e }}">
-            {% for article, score in (display_articles or []) %}
-              <input type="hidden" name="article_ids" value="{{ article.article_id }}">
-            {% endfor %}
             <label for="refine-input">Refine:</label>
             <input type="text" id="refine-input" name="refinement"
                    placeholder="Add context or clarify...">
             <button type="submit" class="btn-refine">→</button>
           </form>
         </div>
-      {% endif %}
     </div>
 
   </div>
+
+  <script>
+    // ── Utilities ────────────────────────────────────────────────────────────
+    function esc(s) {
+      return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function buildCard(a) {
+      const notInAiClass = a.in_ai ? '' : ' not-in-ai';
+      const titleHtml = a.url
+        ? `<a class="card-title" href="${esc(a.url)}" target="_blank" title="${esc(a.title)}">${esc(a.title)}</a>`
+        : `<span class="card-title" title="${esc(a.title)}">${esc(a.title)}</span>`;
+      const staleHtml = a.is_stale
+        ? ` <span class="stale-badge">⚠ Last updated ${esc(String(a.updated).slice(0, 4))}</span>`
+        : '';
+      const metaHtml = [
+        a.owner ? esc(a.owner) : '',
+        a.updated ? ` · Updated: ${esc(a.updated)}${staleHtml}` : '',
+      ].join('');
+      const kwHtml = a.keywords
+        ? `<div class="card-keywords">Keywords: ${esc(a.keywords)}</div>` : '';
+      const exHtml = a.excerpt
+        ? `<div class="card-excerpt">${esc(a.excerpt)}${a.excerpt_truncated ? '…' : ''}</div>` : '';
+      const noteHtml = a.in_ai ? '' : '<div class="not-in-ai-note">Not included in AI response</div>';
+      return `<div class="result-card${notInAiClass}">
+  <div class="card-title-row">${titleHtml}<span class="card-id">#${esc(a.article_id)}</span><span class="relevancy-badge ${esc(a.badge_class)}">${esc(a.badge_label)}</span></div>
+  <div class="card-meta">${metaHtml}</div>${kwHtml}${exHtml}${noteHtml}
+</div>`;
+    }
+
+    // ── DOM refs ─────────────────────────────────────────────────────────────
+    const searchInput   = document.getElementById('search-input');
+    const searchForm    = document.getElementById('search-form');
+    const resultsHeader = document.getElementById('results-header');
+    const resultsList   = document.getElementById('results-list');
+    const aiContent     = document.getElementById('ai-content');
+    const refineArea    = document.getElementById('refine-area');
+    const refineForm    = document.getElementById('refine-form');
+    const refineInput   = document.getElementById('refine-input');
+    const refineQueryIn = refineForm ? refineForm.querySelector('[name="original_query"]') : null;
+
+    // ── State ─────────────────────────────────────────────────────────────────
+    let searchTimer = null;
+    let lastSearchQuery = '';
+
+    // ── Live search (debounced 300 ms) ────────────────────────────────────────
+    async function doSearch(q) {
+      if (!q) {
+        resultsHeader.textContent = 'SEARCH RESULTS';
+        resultsList.innerHTML = '<p class="empty-state">Enter a support question above to get started.</p>';
+        lastSearchQuery = '';
+        return;
+      }
+      try {
+        const resp = await fetch(`/search?q=${encodeURIComponent(q)}`);
+        const data = await resp.json();
+        resultsHeader.textContent = `SEARCH RESULTS (${data.count} found)`;
+        resultsList.innerHTML = data.articles.length === 0
+          ? '<p class="empty-state">No articles found for this query.</p>'
+          : data.articles.map(buildCard).join('');
+        lastSearchQuery = q;
+        // Nudge AI panel if it still shows the initial empty state
+        const aiEmpty = aiContent.querySelector('.empty-state');
+        if (aiEmpty && data.count > 0) {
+          aiEmpty.textContent = 'Press Submit for AI troubleshooting steps.';
+        }
+      } catch (err) {
+        // Show a visible error in the left panel rather than failing silently
+        resultsHeader.textContent = 'SEARCH RESULTS';
+        resultsList.innerHTML = '<p class="empty-state">Could not load results. Check your connection and try again.</p>';
+      }
+    }
+
+    searchInput.addEventListener('input', function () {
+      clearTimeout(searchTimer);
+      const q = this.value.trim();
+      searchTimer = setTimeout(() => doSearch(q), 300);
+    });
+
+    // ── Async AI response ─────────────────────────────────────────────────────
+    function showAiLoading() {
+      aiContent.innerHTML = '<p class="empty-state" style="color:#888;font-style:italic">Generating troubleshooting steps\u2026</p>';
+      if (refineArea) refineArea.style.display = 'none';
+    }
+
+    function showAiResult(data, query) {
+      if (data.error) {
+        aiContent.innerHTML = `<div id="ai-body" class="ai-error">${esc(data.error)}</div>`;
+      } else if (data.response) {
+        let html = `<div id="ai-body">${esc(data.response)}</div>`;
+        if (data.footer) html += `<div id="ai-footer">${esc(data.footer)}</div>`;
+        aiContent.innerHTML = html;
+        if (refineQueryIn) refineQueryIn.value = query;
+        if (refineInput)   refineInput.value   = '';
+        if (refineArea)    refineArea.style.display = '';
+      } else {
+        aiContent.innerHTML = '<p class="empty-state">No response received.</p>';
+      }
+    }
+
+    async function doAi(query, refinement) {
+      showAiLoading();
+      const body = new FormData();
+      body.append('query', query);
+      if (refinement) body.append('refinement', refinement);
+      try {
+        const resp = await fetch('/ai', { method: 'POST', body });
+        const data = await resp.json();
+        showAiResult(data, query);
+      } catch (err) {
+        aiContent.innerHTML = `<div id="ai-body" class="ai-error">Request failed: ${esc(String(err))}</div>`;
+      }
+    }
+
+    // ── Form submit → fire search then AI concurrently ────────────────────────
+    searchForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const q = searchInput.value.trim();
+      if (!q) return;
+      clearTimeout(searchTimer);
+      // Fetch results synchronously first (so user sees them before AI loads)
+      if (lastSearchQuery !== q) {
+        await doSearch(q);
+      }
+      // AI call fires without blocking — user can already read articles
+      doAi(q);
+    });
+
+    // ── Refine submit → async AI only (left panel unchanged) ─────────────────
+    if (refineForm) {
+      refineForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const origQuery  = refineQueryIn ? refineQueryIn.value.trim() : '';
+        const refinement = refineInput   ? refineInput.value.trim()   : '';
+        if (!origQuery) return;
+        doAi(origQuery, refinement);
+      });
+    }
+  </script>
 </body>
 </html>
 """
@@ -910,6 +1050,57 @@ def create_app(
             ai_footer=ai_footer,
             ai_error=ai_error,
         )
+
+    @app.route("/search")
+    def search():
+        """Return JSON article data for the left panel (live / debounced search)."""
+        q = request.args.get("q", "").strip()
+        if not q:
+            return jsonify({"articles": [], "count": 0})
+
+        display = select_display_articles(q, articles, vectorizer, doc_matrix)
+        result = []
+        for i, (article, score) in enumerate(display):
+            if score >= RELEVANCE_HIGH:
+                badge_label, badge_class = "High", "badge-high"
+            elif score >= RELEVANCE_MEDIUM:
+                badge_label, badge_class = "Medium", "badge-medium"
+            else:
+                badge_label, badge_class = "Low", "badge-low"
+            result.append({
+                "article_id": article["article_id"],
+                "title": article["title"],
+                "owner": article.get("owner", ""),
+                "updated": article.get("updated", ""),
+                "is_stale": _is_stale(article.get("updated", "")),
+                "keywords": article.get("keywords", ""),
+                "excerpt": article.get("content", "")[:200],
+                "excerpt_truncated": len(article.get("content", "")) > 200,
+                "badge_label": badge_label,
+                "badge_class": badge_class,
+                "in_ai": i < TOP_K_ARTICLES,
+                "url": f"{KB_BASE_URL}/{article['article_id']}" if article["article_id"] else "",
+            })
+        return jsonify({"articles": result, "count": len(result)})
+
+    @app.route("/ai", methods=["POST"])
+    def ai():
+        """Run the Claude agent and return JSON {response, footer, error}."""
+        query = request.form.get("query", "").strip()
+        refinement = request.form.get("refinement", "").strip()
+        if not query:
+            return jsonify({"response": None, "footer": "", "error": "No query provided."})
+
+        combined = (
+            f"[Original query]: {query} / [Refinement]: {refinement}"
+            if refinement
+            else query
+        )
+        # Derive top articles from the original (un-refined) query
+        display = select_display_articles(query, articles, vectorizer, doc_matrix)
+        top_articles = [a for a, _ in display[:TOP_K_ARTICLES]]
+        ai_response, ai_footer, ai_error = _run_claude(combined, top_articles)
+        return jsonify({"response": ai_response, "footer": ai_footer, "error": ai_error})
 
     return app
 

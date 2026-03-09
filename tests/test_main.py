@@ -765,3 +765,182 @@ class TestCreateApp:
             response = c.post("/", data={"query": "wifi issue"})
             data = response.data.decode()
             assert "Rate limit" in data or "rate limit" in data.lower()
+
+
+# ---------------------------------------------------------------------------
+# GET /search  (JSON endpoint)
+# ---------------------------------------------------------------------------
+
+class TestSearchEndpoint:
+    def _make_app(self):
+        from main import create_app, build_article_index
+        articles = [
+            _make_mock_article("1", content="wifi wireless IllinoisNet SecureW2", keywords="wifi wireless"),
+            _make_mock_article("2", content="VPN Cisco AnyConnect installation", keywords="vpn cisco"),
+        ]
+        vectorizer, matrix = build_article_index(articles)
+        client = MagicMock()
+        app = create_app(client, articles, vectorizer, matrix)
+        app.config["TESTING"] = True
+        return app
+
+    def test_empty_query_returns_empty_list(self):
+        app = self._make_app()
+        with app.test_client() as c:
+            resp = c.get("/search?q=")
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["articles"] == []
+            assert data["count"] == 0
+
+    def test_missing_query_param_returns_empty_list(self):
+        app = self._make_app()
+        with app.test_client() as c:
+            resp = c.get("/search")
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["count"] == 0
+
+    def test_matching_query_returns_articles(self):
+        app = self._make_app()
+        with app.test_client() as c:
+            resp = c.get("/search?q=wifi+wireless")
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["count"] > 0
+            assert any(a["article_id"] == "1" for a in data["articles"])
+
+    def test_article_fields_present(self):
+        app = self._make_app()
+        with app.test_client() as c:
+            resp = c.get("/search?q=wifi")
+            data = resp.get_json()
+            assert data["count"] > 0
+            article = data["articles"][0]
+            for field in ("article_id", "title", "owner", "updated", "is_stale",
+                          "keywords", "excerpt", "excerpt_truncated",
+                          "badge_label", "badge_class", "in_ai", "url"):
+                assert field in article, f"Missing field: {field}"
+
+    def test_in_ai_flag_true_for_first_top_k(self):
+        from main import TOP_K_ARTICLES
+        app = self._make_app()
+        with app.test_client() as c:
+            resp = c.get("/search?q=wifi")
+            data = resp.get_json()
+            # First TOP_K_ARTICLES results should have in_ai=True
+            for i, a in enumerate(data["articles"]):
+                if i < TOP_K_ARTICLES:
+                    assert a["in_ai"] is True
+                else:
+                    assert a["in_ai"] is False
+
+    def test_badge_label_is_valid(self):
+        app = self._make_app()
+        with app.test_client() as c:
+            resp = c.get("/search?q=wifi")
+            data = resp.get_json()
+            for a in data["articles"]:
+                assert a["badge_label"] in ("High", "Medium", "Low")
+
+    def test_returns_json_content_type(self):
+        app = self._make_app()
+        with app.test_client() as c:
+            resp = c.get("/search?q=wifi")
+            assert "application/json" in resp.content_type
+
+
+# ---------------------------------------------------------------------------
+# POST /ai  (JSON endpoint)
+# ---------------------------------------------------------------------------
+
+class TestAiEndpoint:
+    def _make_app(self, assistant_response: str = "AI troubleshooting answer."):
+        from main import create_app, build_article_index
+        articles = [_make_mock_article("1", content="wifi SecureW2 IllinoisNet")]
+        vectorizer, matrix = build_article_index(articles)
+        client = MagicMock()
+        text_block = MagicMock()
+        text_block.type = "text"
+        text_block.text = assistant_response
+        mock_response = MagicMock()
+        mock_response.content = [text_block]
+        client.messages.create.return_value = mock_response
+        app = create_app(client, articles, vectorizer, matrix)
+        app.config["TESTING"] = True
+        return app
+
+    def test_missing_query_returns_error(self):
+        app = self._make_app()
+        with app.test_client() as c:
+            resp = c.post("/ai", data={})
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["error"]
+            assert data["response"] is None
+
+    def test_valid_query_returns_response(self):
+        app = self._make_app("Here are the troubleshooting steps.")
+        with app.test_client() as c:
+            resp = c.post("/ai", data={"query": "wifi issue"})
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["response"] == "Here are the troubleshooting steps."
+            assert data["error"] == ""
+
+    def test_refinement_combined_into_prompt(self):
+        """The Claude client must be called once and receive the combined query."""
+        from main import create_app, build_article_index
+        articles = [_make_mock_article("1", content="wifi IllinoisNet")]
+        vectorizer, matrix = build_article_index(articles)
+        client = MagicMock()
+        text_block = MagicMock()
+        text_block.type = "text"
+        text_block.text = "Refined steps."
+        mock_resp = MagicMock()
+        mock_resp.content = [text_block]
+        client.messages.create.return_value = mock_resp
+        app = create_app(client, articles, vectorizer, matrix)
+        app.config["TESTING"] = True
+        with app.test_client() as c:
+            resp = c.post("/ai", data={"query": "wifi issue", "refinement": "user is on macOS"})
+            data = resp.get_json()
+            assert data["response"] == "Refined steps."
+        # Verify the prompt sent to Claude contains both parts
+        _, call_kwargs = client.messages.create.call_args
+        messages = call_kwargs["messages"]
+        combined = messages[0]["content"]
+        assert "wifi issue" in combined
+        assert "user is on macOS" in combined
+
+    def test_footer_contains_article_count(self):
+        app = self._make_app("Steps here.")
+        with app.test_client() as c:
+            resp = c.post("/ai", data={"query": "wifi"})
+            data = resp.get_json()
+            assert "article" in data["footer"]
+
+    def test_rate_limit_error_returns_json_error(self):
+        from main import create_app, build_article_index
+        import anthropic as anthropic_module
+        articles = [_make_mock_article()]
+        vectorizer, matrix = build_article_index(articles)
+        client = MagicMock()
+        client.messages.create.side_effect = anthropic_module.RateLimitError(
+            message="rate limit",
+            response=MagicMock(status_code=429, headers={}),
+            body={},
+        )
+        app = create_app(client, articles, vectorizer, matrix)
+        app.config["TESTING"] = True
+        with app.test_client() as c:
+            resp = c.post("/ai", data={"query": "wifi issue"})
+            data = resp.get_json()
+            assert "rate limit" in data["error"].lower()
+            assert data["response"] is None
+
+    def test_returns_json_content_type(self):
+        app = self._make_app()
+        with app.test_client() as c:
+            resp = c.post("/ai", data={"query": "wifi"})
+            assert "application/json" in resp.content_type
