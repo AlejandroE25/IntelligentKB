@@ -394,122 +394,159 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>KB AI Search Agent</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
-      font-family: Arial, sans-serif;
-      background: #f5f5f5;
-      color: #222;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 13px;
+      background: #262626;
+      color: #cccccc;
+      margin: 0;
+      padding: 0;
       display: flex;
       flex-direction: column;
       height: 100vh;
       overflow: hidden;
     }
 
-    header {
-      background: #fff;
-      border-bottom: 1px solid #ccc;
-      padding: 8px 12px;
+    /* ── HEADER ── */
+    #page-header {
+      background: #262626;
+      padding: 8px 12px 4px 12px;
+      text-align: center;
       flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      border-bottom: 2px solid #555;
     }
-    header h1 {
-      font-size: 1rem;
+    #page-header h1 {
+      font-size: 16px;
       font-weight: bold;
+      font-style: italic;
+      color: #7aaee8;
+      margin: 0 0 4px 0;
     }
-    header a {
-      color: #0066cc;
-      font-size: 0.85rem;
-      text-decoration: none;
+    #page-header .header-link {
+      float: right;
+      margin-top: -22px;
     }
-    header a:hover { text-decoration: underline; }
+    #page-header .header-link a {
+      color: #7aaee8;
+      font-style: italic;
+      font-size: 12px;
+    }
+    #page-header .header-link a:hover { text-decoration: underline; }
+    hr.rule {
+      border: none;
+      border-top: 1px solid #555;
+      margin: 0;
+    }
 
+    /* ── CHAT TRANSCRIPT ── */
     #chat {
       flex: 1;
       overflow-y: auto;
-      padding: 10px 14px;
+      padding: 8px 12px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
     }
 
-    .entry { max-width: 100%; }
+    .entry { width: 100%; }
 
+    /* Section bar (like the gray record-details bars in the reference) */
     .entry-label {
-      font-size: 0.75rem;
-      color: #666;
-      margin-bottom: 2px;
+      background: #3c5070;
+      color: #ffffff;
+      font-weight: bold;
+      font-size: 12px;
+      padding: 2px 6px;
+      border: 1px solid #506080;
     }
 
     .entry-body {
       white-space: pre-wrap;
       word-wrap: break-word;
       line-height: 1.5;
-      font-size: 0.9rem;
-      padding: 6px 10px;
-      border: 1px solid #ccc;
-      background: #fff;
+      font-size: 13px;
+      padding: 5px 8px;
+      background: #2e2e2e;
+      border: 1px solid #444;
+      border-top: none;
+      color: #cccccc;
     }
-    .entry.user .entry-body {
-      background: #eef4ff;
-      border-color: #aac4e8;
-    }
-    .entry.error .entry-body {
-      background: #fff0f0;
-      border-color: #e8aaaa;
-      color: #c00;
-    }
+    .entry.user .entry-label { background: #3a4a3a; border-color: #4a6050; }
+    .entry.user .entry-body  { background: #2a2e2a; border-color: #404840; color: #b8ccb8; }
+    .entry.error .entry-label { background: #4a2a2a; border-color: #6a3030; }
+    .entry.error .entry-body  { background: #2e2020; border-color: #503030; color: #d08080; }
 
-    .entry.assistant .entry-body a { color: #0066cc; }
-    .entry.assistant .entry-body a:hover { text-decoration: underline; }
+    .entry.assistant .entry-body a { color: #7aaee8; text-decoration: underline; }
+    .entry.assistant .entry-body a:hover { color: #aaccff; }
 
     .empty-state {
-      color: #888;
-      font-size: 0.9rem;
+      color: #777;
+      font-size: 13px;
+      font-style: italic;
       margin: auto;
       text-align: center;
     }
 
-    footer {
-      background: #fff;
-      border-top: 1px solid #ccc;
-      padding: 8px 12px;
+    /* ── FOOTER / INPUT ── */
+    #page-footer {
+      background: #262626;
+      border-top: 2px solid #555;
+      padding: 6px 12px;
       flex-shrink: 0;
     }
-    form { display: flex; gap: 8px; align-items: flex-end; }
+    #page-footer .section-bar {
+      background: #3c5070;
+      color: #fff;
+      font-weight: bold;
+      font-size: 12px;
+      padding: 2px 6px;
+      border: 1px solid #506080;
+      margin-bottom: 0;
+    }
+    #page-footer form {
+      display: flex;
+      gap: 6px;
+      align-items: flex-end;
+      background: #2e2e2e;
+      border: 1px solid #444;
+      border-top: none;
+      padding: 6px;
+    }
     textarea {
       flex: 1;
-      border: 1px solid #ccc;
-      padding: 6px 10px;
-      font-family: inherit;
-      font-size: 0.9rem;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 13px;
+      background: #1e1e1e;
+      color: #cccccc;
+      border: 2px inset #555;
+      padding: 3px 5px;
       resize: none;
-      height: 42px;
-      line-height: 1.45;
+      height: 40px;
+      line-height: 1.4;
     }
-    textarea:focus { outline: none; border-color: #0066cc; }
+    textarea:focus { outline: none; border-color: #7aaee8; }
     button[type=submit] {
-      background: #0066cc;
-      color: #fff;
-      border: none;
-      font-family: inherit;
-      font-size: 0.9rem;
-      padding: 0 16px;
-      height: 42px;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 13px;
+      background: #3a3a3a;
+      color: #cccccc;
+      border: 2px outset #666;
+      padding: 3px 14px;
+      height: 40px;
       cursor: pointer;
       white-space: nowrap;
     }
-    button[type=submit]:hover { background: #0055aa; }
-    button[type=submit]:disabled { background: #999; cursor: default; }
+    button[type=submit]:hover { background: #484848; }
+    button[type=submit]:active { border-style: inset; }
+    button[type=submit]:disabled { color: #666; cursor: default; }
   </style>
 </head>
 <body>
-  <header>
+  <div id="page-header">
+    <div class="header-link"><a href="/clear">[ New Session ]</a></div>
     <h1>KB AI Search Agent</h1>
-    <a href="/clear">New Session</a>
-  </header>
+  </div>
+  <hr class="rule">
 
   <div id="chat">
     {% if not conversation %}
@@ -518,26 +555,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     {% for msg in conversation %}
       <div class="entry {{ msg.role }}">
         <div class="entry-label">
-          {% if msg.role == 'user' %}You{% else %}KB Agent{% endif %}
+          {% if msg.role == 'user' %}You:{% else %}KB Agent:{% endif %}
         </div>
         <div class="entry-body">{{ msg.content }}</div>
       </div>
     {% endfor %}
     {% if error %}
       <div class="entry error">
-        <div class="entry-label">Error</div>
+        <div class="entry-label">Error:</div>
         <div class="entry-body">{{ error }}</div>
       </div>
     {% endif %}
   </div>
 
-  <footer>
+  <div id="page-footer">
+    <div class="section-bar">Enter Query:</div>
     <form method="post" action="/">
       <textarea name="issue" placeholder="Describe the support issue..."
                 autofocus>{{ prefill }}</textarea>
       <button type="submit">Send</button>
     </form>
-  </footer>
+  </div>
 
   <script>
     // Auto-scroll to bottom on load
@@ -563,7 +601,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       const userEntry = document.createElement('div');
       userEntry.className = 'entry user';
       userEntry.innerHTML =
-        '<div class="entry-label">You</div>' +
+        '<div class="entry-label">You:</div>' +
         '<div class="entry-body">' + escapeHtml(val) + '</div>';
       chat.appendChild(userEntry);
 
@@ -571,7 +609,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       const thinkingEntry = document.createElement('div');
       thinkingEntry.className = 'entry assistant';
       thinkingEntry.innerHTML =
-        '<div class="entry-label">KB Agent</div>' +
+        '<div class="entry-label">KB Agent:</div>' +
         '<div class="entry-body" style="color:#888">Processing...</div>';
       chat.appendChild(thinkingEntry);
 
