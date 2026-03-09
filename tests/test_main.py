@@ -944,3 +944,104 @@ class TestAiEndpoint:
         with app.test_client() as c:
             resp = c.post("/ai", data={"query": "wifi"})
             assert "application/json" in resp.content_type
+
+
+# ---------------------------------------------------------------------------
+# GET /articles  (articles listing page)
+# ---------------------------------------------------------------------------
+
+class TestArticlesEndpoint:
+    def _make_app(self, article_list=None):
+        from main import create_app, build_article_index
+        if article_list is None:
+            article_list = [
+                _make_mock_article("1", title="Campus Wi-Fi Guide", keywords="wifi wireless"),
+                _make_mock_article("2", title="VPN Setup", keywords="vpn cisco", updated="2020-01-01"),
+                _make_mock_article("3", title="MFA Troubleshooting", keywords="mfa"),
+            ]
+        vectorizer, matrix = build_article_index(article_list)
+        client = MagicMock()
+        app = create_app(client, article_list, vectorizer, matrix)
+        app.config["TESTING"] = True
+        return app
+
+    def test_returns_200(self):
+        app = self._make_app()
+        with app.test_client() as c:
+            resp = c.get("/articles")
+            assert resp.status_code == 200
+
+    def test_returns_html_content_type(self):
+        app = self._make_app()
+        with app.test_client() as c:
+            resp = c.get("/articles")
+            assert "text/html" in resp.content_type
+
+    def test_all_article_titles_present(self):
+        app = self._make_app()
+        with app.test_client() as c:
+            resp = c.get("/articles")
+            body = resp.data.decode()
+            assert "Campus Wi-Fi Guide" in body
+            assert "VPN Setup" in body
+            assert "MFA Troubleshooting" in body
+
+    def test_article_ids_present(self):
+        app = self._make_app()
+        with app.test_client() as c:
+            resp = c.get("/articles")
+            body = resp.data.decode()
+            # Article IDs appear in the id-cell table column
+            assert 'class="col-id id-cell">1<' in body
+            assert 'class="col-id id-cell">2<' in body
+            assert 'class="col-id id-cell">3<' in body
+
+    def test_stale_badge_shown_for_old_article(self):
+        app = self._make_app()
+        with app.test_client() as c:
+            resp = c.get("/articles")
+            body = resp.data.decode()
+            # Article "2" has updated="2020-01-01" which is stale
+            assert "stale-badge" in body
+
+    def test_article_count_in_header(self):
+        app = self._make_app()
+        with app.test_client() as c:
+            resp = c.get("/articles")
+            body = resp.data.decode()
+            assert "3 articles indexed" in body
+
+    def test_empty_articles_list(self):
+        from main import create_app
+        import numpy as np
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        # Use a dummy vectorizer that won't be called for an empty article list
+        vectorizer = MagicMock(spec=TfidfVectorizer)
+        vectorizer.transform.return_value = np.zeros((0, 1))
+        matrix = np.zeros((0, 1))
+        client = MagicMock()
+        app = create_app(client, [], vectorizer, matrix)
+        app.config["TESTING"] = True
+        with app.test_client() as c:
+            resp = c.get("/articles")
+            assert resp.status_code == 200
+            body = resp.data.decode()
+            assert "No articles are currently indexed" in body
+
+    def test_articles_sorted_alphabetically(self):
+        app = self._make_app()
+        with app.test_client() as c:
+            resp = c.get("/articles")
+            body = resp.data.decode()
+            # "Campus Wi-Fi Guide" comes before "MFA", which comes before "VPN"
+            campus_pos = body.index("Campus Wi-Fi Guide")
+            mfa_pos = body.index("MFA Troubleshooting")
+            vpn_pos = body.index("VPN Setup")
+            assert campus_pos < mfa_pos < vpn_pos
+
+    def test_back_to_search_link_present(self):
+        app = self._make_app()
+        with app.test_client() as c:
+            resp = c.get("/articles")
+            body = resp.data.decode()
+            assert 'href="/"' in body

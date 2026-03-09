@@ -457,6 +457,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       white-space: nowrap;
       flex-shrink: 0;
     }
+    #page-header .nav-link {
+      color: #7aaee8;
+      font-size: 12px;
+      text-decoration: none;
+      white-space: nowrap;
+      flex-shrink: 0;
+      padding: 4px 6px;
+      border: 1px solid #444;
+    }
+    #page-header .nav-link:hover { color: #aaccff; border-color: #7aaee8; }
     #search-form {
       display: flex;
       flex: 1;
@@ -687,6 +697,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <!-- HEADER -->
   <div id="page-header">
     <h1>KB AI Search</h1>
+    <a class="nav-link" href="/articles">Browse Articles</a>
     <form id="search-form" method="post" action="/">
       <input type="text" id="search-input" name="query"
              value="{{ query | e }}"
@@ -927,6 +938,182 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 """
 
 
+ARTICLES_TEMPLATE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KB Articles – KB AI Search</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 13px;
+      background: #262626;
+      color: #cccccc;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    #page-header {
+      background: #262626;
+      padding: 8px 12px;
+      flex-shrink: 0;
+      border-bottom: 2px solid #555;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #page-header h1 {
+      font-size: 15px;
+      font-weight: bold;
+      font-style: italic;
+      color: #7aaee8;
+      margin: 0;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    #page-header .nav-link {
+      color: #7aaee8;
+      font-size: 12px;
+      text-decoration: none;
+      white-space: nowrap;
+      flex-shrink: 0;
+      padding: 4px 6px;
+      border: 1px solid #444;
+    }
+    #page-header .nav-link:hover { color: #aaccff; border-color: #7aaee8; }
+    .header-count {
+      color: #888;
+      font-size: 12px;
+      margin-left: auto;
+    }
+
+    /* ── CONTENT ── */
+    #content {
+      padding: 12px 16px;
+      flex: 1;
+    }
+    .page-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #7aaee8;
+      margin: 0 0 12px 0;
+    }
+
+    /* ── TABLE ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    thead th {
+      background: #3c5070;
+      color: #fff;
+      font-size: 12px;
+      font-weight: bold;
+      padding: 5px 8px;
+      text-align: left;
+      white-space: nowrap;
+    }
+    tbody tr:nth-child(even) { background: #2a2a2a; }
+    tbody tr:hover { background: #303040; }
+    td {
+      padding: 5px 8px;
+      border-bottom: 1px solid #3a3a3a;
+      vertical-align: top;
+    }
+    .col-title { width: 30%; }
+    .col-id    { width: 8%; white-space: nowrap; }
+    .col-owner { width: 20%; }
+    .col-updated { width: 12%; white-space: nowrap; }
+    .col-keywords { width: 30%; }
+    .article-link {
+      color: #7aaee8;
+      text-decoration: none;
+    }
+    .article-link:hover { color: #aaccff; text-decoration: underline; }
+    .stale-badge {
+      background: #3a2a10;
+      color: #c89040;
+      border: 1px solid #6a4a20;
+      font-size: 10px;
+      padding: 0 4px;
+      border-radius: 2px;
+      margin-left: 4px;
+      white-space: nowrap;
+    }
+    .id-cell {
+      color: #777;
+      font-size: 11px;
+    }
+    .keywords-cell {
+      color: #999;
+      font-size: 11px;
+    }
+    .empty-state {
+      color: #777;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <!-- HEADER -->
+  <div id="page-header">
+    <h1>KB AI Search</h1>
+    <a class="nav-link" href="/">← Back to Search</a>
+    <span class="header-count">{{ article_count }} article{{ 's' if article_count != 1 else '' }} indexed</span>
+  </div>
+
+  <!-- CONTENT -->
+  <div id="content">
+    <p class="page-title">All Indexed Articles</p>
+    {% if articles %}
+    <table>
+      <thead>
+        <tr>
+          <th class="col-title">Title</th>
+          <th class="col-id">Article ID</th>
+          <th class="col-owner">Owner</th>
+          <th class="col-updated">Updated</th>
+          <th class="col-keywords">Keywords</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for article in articles %}
+        <tr>
+          <td class="col-title">
+            {% if article.article_id %}
+              <a class="article-link" href="{{ kb_base_url }}/{{ article.article_id }}" target="_blank">{{ article.title }}</a>
+            {% else %}
+              {{ article.title }}
+            {% endif %}
+          </td>
+          <td class="col-id id-cell">{{ article.article_id or '—' }}</td>
+          <td class="col-owner">{{ article.owner or '' }}</td>
+          <td class="col-updated">
+            {{ article.updated or '' }}
+            {% if article.updated and article.updated | is_stale %}
+              <span class="stale-badge">⚠ {{ article.updated[:4] }}</span>
+            {% endif %}
+          </td>
+          <td class="col-keywords keywords-cell">{{ article.keywords or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="empty-state">No articles are currently indexed.</p>
+    {% endif %}
+  </div>
+</body>
+</html>
+"""
+
+
 def create_app(
     client: anthropic.Anthropic,
     articles: list[dict[str, str]],
@@ -1101,6 +1288,17 @@ def create_app(
         top_articles = [a for a, _ in display[:TOP_K_ARTICLES]]
         ai_response, ai_footer, ai_error = _run_claude(combined, top_articles)
         return jsonify({"response": ai_response, "footer": ai_footer, "error": ai_error})
+
+    @app.route("/articles")
+    def articles_index():
+        """Render a page listing all indexed KB articles."""
+        sorted_articles = sorted(articles, key=lambda a: a.get("title", "").lower())
+        return render_template_string(
+            ARTICLES_TEMPLATE,
+            articles=sorted_articles,
+            article_count=len(sorted_articles),
+            kb_base_url=KB_BASE_URL,
+        )
 
     return app
 
