@@ -1,0 +1,405 @@
+<!DOCTYPE html><html lang="en-US"><head><script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-5MRHB7J');</script><title>Office 365, Email Rules, Forwarding, Redirection, and Troubleshooting</title><script src="https://code.jquery.com/jquery-1.11.2.min.js"></script><style>.expand-control-icon::before{  content:url('/graph/plus.png');}.expand-content{  display:block;  opacity: 1;}.expand-hidden{ display: none; opacity: 0;} .cloakDefaultClose{    background-image: url(/images/group180/shared/wiki/navigate_down_10.gif);    width: 10px;    height: 10px;    display: inline-block;    }.cloakDefaultOpen{    background-image: url(/images/group180/shared/wiki/navigate_right_10.gif);    width: 10px;    height: 10px;    display: inline-block;}  </style><script src="https://code.jquery.com/jquery-1.11.2.min.js"></script><script>jQuery(document).on('click', '.expand-control', function(event) {              $elt=jQuery(this).next('.expand-content');              if($elt.hasClass("expand-hidden")){              $elt.removeClass("expand-hidden");              }else{              $elt.addClass("expand-hidden");              }                  });</script><meta http-equiv="content-type" content="text/html; charset=utf-8"><meta name="description" content=""><meta name="keywords" content="KnowledgeBase, knowledge base, universities, colleges, higher education, knowledge sharing, knowledge collaboration, technical support self-service solutions"><meta name="application-name" content="University KnowledgeBase"><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="/css/kbs-base.js?v=26292" type="text/javascript"></script><link rel="stylesheet" type="text/css" media="screen" href="/css/froala-editor@3.2.2/froala_style.min.css"><link rel="stylesheet" type="text/css" media="screen" href="/css/froala-editor@3.2.2/froala_override.css"><link rel="stylesheet" type="text/css" media="screen" href="/css/tinymce@5/content.css"><link rel="stylesheet" type="text/css" media="screen" href="/css/kbs-base.css?v=26292"><link rel="stylesheet" type="text/css" media="screen" href="/css/default_layout1.css?v=26292"><style>/* 
+This "Custom CSS Four" file was originally copied from the External Custom CSS One file present on answers.uillinois.edu/illinois/ in December 2023.
+
+Custom CSS One is being left in place for now, so that switching from the new Four to the old One is relatively simple in case of breakage.
+
+Prior to this file's creation, Custom CSS Four held a copy of the unimplemented cloakDefaultClose and cloakDefaultOpen code still found in Internal's Custom CSS Two.
+ */
+
+/*-----*/
+
+/* un-clicked links */
+.kbleftlinks a, .kbrightlinks a, a, #qlinks a, #qcats a, #resource-links a, #news a, #topDocs a, #recentDocs a, .custom a, #cat-nav ul li a  {color:#2F568C; text-decoration:underline;}
+
+/* hovered-over links */
+.kbleftlinks a:hover, .kbrightlinks a:hover, a:hover, #qlinks a:hover, #qcats a:hover, #resource-links a:hover, #news a:hover, #topDocs a:hover, #recentDocs a:hover, .custom a:hover, #cat-nav ul li a:hover {color:#C84113;}
+
+/* already-clicked links */
+.kbleftlinks a:visited, .kbrightlinks a:visited, a:visited, #qlinks a:visited, #qcats a:visited, #resource-links a:visited, #news a:visited, #topDocs a:visited, #recentDocs a:visited, .custom a:visited, #cat-nav ul li a:visited {color:#00779F;}
+
+/* section headings */
+.kbleftlinks .head, .kbrightlinks .head, #qlinks .head, #qcats .head, #resource-links .head,  #news h2, #topDocs h2, #recentDocs h2, .custom h2, #cat-nav ul li a h2 {background-color:#FF5F05; color:#252525;}
+.kbleftlinks ul, .kbrightlinks ul, #qlinks ul, #qcats ul, #resource-links ul {border-left-color:#FF5F05; border-right-color:#FF5F05; border-bottom-color:#FF5F05;}
+.kbleftlinks li, .kbrightlinks li, #qlinks li, #qcats ul, #resource-links li {border-bottom-color:#13294B;}
+
+/* main header */
+#top-links {background-color:#FF5F05;}
+#top-links-int {background-color:#080808;}
+#logo-search, #search-form {background:#13294B;}
+
+/* 'Site Map' and other header buttons */
+#search-form a {color: #0E0F20 !important; border: 1px solid #0E0F20 !important; background-color:#F4BCA9;}
+
+
+/* unknown or unimplemented */
+.kbleftlinks a, .kbrightlinks a, #qlinks a, #qcats a, #resource-links a, #cat-nav ul li a {text-decoration:none;}
+a[name] {color:inherit; background-color:inherit; text-decoration:inherit;}
+a.boxlink, input.boxlink {font-size:11px; color:#365899; background-color:#eceef5; text-decoration:none; padding:0px 6px 0px 6px; border:1px solid #cad4e7; margin-left:2px; margin-bottom:5px; text-align:right; border-radius:4px;}
+
+/* add-ons */
+.kbleftlinks ul {border:0;}
+
+.kbleftlinks li {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+nav ul li {
+  margin: 0;
+  padding: .5em 0px .5em 0px;
+  list-style-type: none;
+  font-size: 1.2em; }
+
+nav ul li a {
+  display: block; }
+
+nav ul li a:hover { 
+color: #A9852A; 
+  text-decoration: none; }
+
+.offscreen {
+    left: -200em;
+    position: absolute;
+    top: -20em; }
+
+.status {
+  background: url(/images/group180/shared/logo/info.png) left top no-repeat;
+  background-size: 1.5em;
+ }
+
+.ticket {
+  background: url(/images/group180/shared/logo/partners.png) left top no-repeat; 
+  background-size: 1.5em;
+}
+
+.email { 
+  background: url(/images/group180/shared/logo/email.png) left top no-repeat; 
+  background-size: 1.5em;
+}
+
+.call {
+  background: url(/images/group180/shared/logo/call.png) left top no-repeat; 
+  background-size: 1.5em;
+}
+
+.add-contact h3 {
+  font-family="Montserrat," sans-serif; 
+  font-size: 16px;
+  font-weight: normal;
+  margin: 0;
+  padding-bottom: 8px; }
+
+/*end image-bulleted left nav styles */
+
+div.rightbox
+{
+float: right;
+padding: .5em;
+width: 15%;
+border: .1em solid grey;
+}
+
+
+/* Styling the content links in the Lync left nav */
+#middle-sect3 .kbleftlinks:first-child a 
+{
+	font-size: 1.2em;
+}
+
+/* Making the headlines easier to scan for */
+#maincontent ul
+{
+	display:table;
+}
+
+#maincontent
+{
+	padding-left:2em;
+}
+#maincontent h1, #maincontent h2, #maincontent h3, #maincontent h4
+{
+	margin-left:-1.5em;
+}
+
+/* Table styling from Keith Hays */
+#maincontent table 
+{
+border-collapse: collapse;
+}
+#maincontent td, #maincontent th 
+{ 
+border: 1px solid #000
+}
+#maincontent th 
+{ 
+background-color: #eee;
+}
+
+/* Note, warning, alert, info box styles based on the wiki visuals */
+.note-box, .tip-box, .warning-box, .info-box, .code-block-box, .page-alert-box {
+    border-color: #be7;
+    border-radius: 5px;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.1);
+    margin: 10px 0;
+    overflow: hidden;
+    padding: 1rem;
+}
+.note-box {
+	background-color: #ffffce;
+	margin: 10px 0em;
+	padding: 1rem;
+
+}
+.note-box p:first-child::before {
+    content: url("/images/group180/shared/images/note-warning-mini.png");  
+    margin-right: 10px;
+}
+
+.tip-box {
+	background-color: #dfd;
+	margin: 10px 0em;
+	padding: 1rem;
+}
+.tip-box p:first-child::before {
+    content: url("/images/group180/shared/images/note-check-mini.gif");  
+    margin-right: 10px;
+}
+
+.warning-box {
+	background-color: #fcc;
+	margin: 10px 0em;
+	padding: 1rem;
+}
+
+.warning-box p:first-child::before {
+    content: url("/images/group180/shared/images/note-forbidden-mini.gif");  
+    margin-right: 10px;
+}
+
+
+.info-box {
+    background-color:#BFC9D9;
+}
+.info-box p:first-child::before {
+    content: url("/images/group180/shared/images/note-info-mini.gif");  
+    margin-right: 10px;
+}
+.code {
+    font-family: monospace;
+    font-size: 13px;
+    line-height: 1.1em;
+}
+.code-block-box {
+    background-color: #ccc;
+    border: 1px dashed #666;
+    font-family: monospace;
+    font-size: 13px;
+    line-height: 1.1em;
+}
+.page-alert-box {
+    background: url("/images/group180/shared/images/note-info.gif") no-repeat scroll left top #ffffce;
+    border-color: #be7;
+    padding-left: 50px;
+}
+.checklist-box {
+    margin-bottom: 10px;
+    margin-left: 10px;
+}
+.checklist-box .checked {
+    background: url("/images/group180/shared/images/checkbox-checked.gif") no-repeat scroll left center rgba(0, 0, 0, 0);
+    margin-bottom: 10px;
+    padding-left: 25px;
+}
+.checklist-box .unchecked {
+    background: url("/images/group180/shared/images/checkbox-trans.gif") no-repeat scroll left center rgba(0, 0, 0, 0);
+    margin-bottom: 10px;
+    padding-left: 25px;
+}
+.checklist-box .crossed {
+    background: url("/images/group180/shared/images/checkbox-red-x.gif") no-repeat scroll left center rgba(0, 0, 0, 0);
+    margin-bottom: 10px;
+    padding-left: 25px;
+}
+
+.left-menu { /* make sure this class comes after the alert-box classes */
+	margin-left: 21%;
+}
+
+/* Classtech Photo Templates */
+figure.roomphoto {
+   max-width: 500px;
+   border-style: solid;
+   border-width: 1px;
+}
+
+img.roomphoto {
+    border-bottom: solid 1px;
+}
+
+figcaption.roomphoto {
+    padding: 12px;
+}
+
+img.tablephoto {
+    height: 64px;
+    border-radius: 5px;
+}
+
+/* new callouts */
+div.orangecallout {
+    border-style: solid; 
+    border-color: #ff5f05; 
+    background-color: #ffcc99; 
+    padding: 22px;
+}</style><link rel="stylesheet" type="text/css" media="screen" href="/css/uw-buttons.css"><link rel="stylesheet" type="text/css" media="print" href="/css/print.css"></head><body><noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5MRHB7J" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript><div id="skip-nav"><a href="#maincontent">Skip navigation</a></div><div id="body-container"><header role="banner"><div id="top-links-int"><div class="section group top"><div class="col span_top_1_of_3"><span class="hidden">Office 365, Email Rules, Forwarding, Redirection, and Troubleshooting</span></div><div class="col span_top_2_of_3"><div id="top-left-links"><ul><li class="first"><a href="http://illinois.edu/">University of Illinois</a></li></ul></div></div><div class="col span_top_3_of_3"><div id="top-right-links"><ul><li class="first"><a href="http://techservices.illinois.edu/services">Services & Info</a></li><li><a href="http://techservices.illinois.edu/contact">Contact Us</a></li><li><a href="/Shibboleth.sso/Logout">Sign out</a></li></ul></div></div></div></div><div id="logo-search"><div class="section group logo-search"><div class="col span_logo-search_1_of_2"><div id="group-logo"><a href="./"><img src="/images/group180/logo/CIO-Dark.png" alt="University of Illinois Internal KB" width="375" height="80"><span class="group-name-hide">University of Illinois Technology Services</span></a></div></div><div class="col span_logo-search_2_of_2"><div id="search-form" class="upper" role="search"><form accept-charset="UTF-8" method="get" action="search.php" title="Search"><span id="resultc" role="status" aria-live="polite"></span><br><label for="q" class="hidden">Search term</label><input class="inputBox" id="q" type="text" name="q" placeholder="Search the KB..." value="" size="36" maxlength="140" onkeyup="resultC(this.value)" aria-controls="resultc" aria-autocomplete="both" > <label for="cat" class="hidden">Select topic</label><select class="selectBox kb-dropdown-fixed-300m" id="cat" name="cat" onchange="this.form.submit();"><option value="0">All Topics</option><option value="4561">Accounts and passwords</option><option value="4573">&nbsp; Password manager</option><option value="4672">CCME</option><option value="4562">Communication and collaboration</option><option value="7361">&nbsp; cPanel web hosting</option><option value="6284">&nbsp; DigitalsSignage </option><option value="4581">&nbsp; Exchange</option><option value="4582">&nbsp; Google Apps @ Illinois</option><option value="9935">&nbsp; Illinois mobile app</option><option value="4579">&nbsp; Illinois wiki</option><option value="5287">&nbsp; Kaltura</option><option value="4583">&nbsp; Lync / Skype for Business</option><option value="5169">&nbsp; Office 365</option><option value="4584">&nbsp; Publish.illinois.edu (PIE)</option><option value="4586">&nbsp; U of I Box</option><option value="8615">&nbsp; ZOOM</option><option value="4563">Computing infrastructure</option><option value="5987">&nbsp; Amazon Web Services</option><option value="4564">Help and training</option><option value="4596">&nbsp; Accessibility outreach </option><option value="4600">&nbsp; Help Desk</option><option value="14322">&nbsp; KnowledgeBase</option><option value="4608">&nbsp; OnSite consulting</option><option value="4613">&nbsp; Status</option><option value="4615">&nbsp; Training services (FAST 3)</option><option value="4616">&nbsp; Usability consulting</option><option value="14016">Human Resources</option><option value="14017">&nbsp; Training & development</option><option value="5700">Known errors</option><option value="4565">Networking</option><option value="4619">&nbsp; Virtual private networking (VPN)</option><option value="4627">&nbsp; Wireless</option><option value="14500">&nbsp; &nbsp; Wireless KB Rewrite</option><option value="4566">Printing and software</option><option value="4631">&nbsp; WebStore</option><option value="4567">Safety and security</option><option value="5699">Swanlund</option><option value="4568">Teaching and learning</option><option value="8487">&nbsp; Canvas@illinois.edu</option><option value="4651">&nbsp; Illinois Compass 2G</option></select> <label for="aud" class="hidden">Select audience</label><select class="selectBox kb-dropdown-fixed-300m" id="aud" name="aud" onchange="this.form.submit();"><option value="0">All Audiences</option><option value="100">Undergraduate students</option><option value="101">Graduate students</option><option value="102">Faculty and staff</option><option value="99">IT Pros</option></select> <input class="search" type="submit" value="SEARCH"></form></div><script>if(document.getElementsByClassName("search")){document.getElementsByClassName("search")[0].addEventListener("click", searchBtn);}</script></div></div></div></header><div id="container"><div id="middle-sect3"><div class="section group middle-sect3"><div class="col span_middle3_1_of_3"><nav role="navigation" aria-labelledby="Quicklinks"><div class="kbleftlinks"><span id="Quicklinks" class="head">Quick links</span><ul id="kbleftul0"><div class="fr-element fr-view"><div class="print-doc-body"><div class="kbleftlinks"><nav>
+<h2 class="offscreen">Help Options</h2>
+<ul>
+<li><a href="http://status.illinois.edu/" class="status">&nbsp; &nbsp; &nbsp;Check status</a></li>
+<li><a href="https://help.uillinois.edu/TDClient/42/UIUC/Home/" class="ticket">&nbsp; &nbsp; &nbsp;Get help</a></li>
+<li><a href="mailto:consult@illinois.edu" class="email">&nbsp; &nbsp; &nbsp;Email the Help Desk</a></li>
+<li><a href="tel:+12172447000" class="call">&nbsp; &nbsp; &nbsp;Call the Help Desk<br />&nbsp; &nbsp; &nbsp;(217) 244-7000</a></li>
+<li><span><a href="https://appserv7.admin.uillinois.edu/FormBuilderSurvey/Survey/uiuc_technology_services/help_desk/submit_a_suggestion/" target="_blank" title="submit" rel="noopener">Submit a suggestion</a></span></li>
+</ul>
+</nav><!-- commenting out content that will be duplicated above, but leaving in place in case the area and styling wants to be used for other content
+
+<div class="add-contact clearfix">
+            	<h3><br /></h3></div><div class="add-contact clearfix">
+            </div>
+            <div class="add-contact clearfix">    
+                <h3>Urbana-Champaign</h3> 
+                	<div class="campuses">
+	                	<a href="https://techservices.illinois.edu/get-help/help-desk">Technology Services at Illinois</a><br />
+	                	<a href="tel:+12172447000">(217) 244-7000</a><br />
+						<a href="mailto:consult@illinois.edu">consult@illinois.edu</a></div>
+--></div></div></div></ul></div></nav></div><div class="col span_middle3_2_of_3"><main id="maincontent" role="main"><div id="page-content" role="article"><div class="fr-element fr-view"><br><span class="topic-path"><a href="topics.php">Topics Map</a> &gt; <a href="search.php?cat=4562">Communication and collaboration</a> &gt; <a href="search.php?cat=4581">Exchange</a> <br></span><span class="topic-path"><a href="topics.php">Topics Map</a> &gt; <a href="search.php?cat=4562">Communication and collaboration</a> &gt; <a href="search.php?cat=5169">Office 365</a> <br></span><span class="topic-path"><a href="topics.php">Topics Map</a> &gt; <a href="search.php?cat=4562">Communication and collaboration</a> &gt; <a href="search.php?cat=5285">Email</a> <br></span><h1 class="title">Office 365, Email Rules, Forwarding, Redirection, and Troubleshooting</h1><div style="float:right;text-align:right;padding:1px;border-radius:2px;"> <input class="boxlink doc-action" type="submit" value="Show changes" onclick="window.open('resultc.php?action=7&amp;id=150155','Show Changes','scrollbars=yes,resizable=yes,titlebar=no,menubar=no,location=no,directories=no,status=no,width=800,height=780');return false;"> <a class="boxlink doc-action" href="/kbAdmin/document.php?group_id=180&amp;openEditor=1&amp;id=150155" target="_blank" rel="noopener">Edit page</a></div><div class="doc-summary">Comprehensive document regarding university exchange email forwarding, redirection and common troubleshooting scenarios</div><div class="doc-body"><!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd">
+<h2>Table of Contents</h2><ul>
+<li><a href="#Disclaimer">Email Forwarding and Redirection Disclaimer</a></li>
+<li><a href="#InboxRules">Inbox Rules</a></li>
+<li><a href="#EmailRedirection">Forward/Redirect Emails to Another Account</a></li>
+<li><a href="#ForwardAttachment">Forward Emails as an Attachment</a></li>
+<li><a href="#Troubleshooting">Troubleshooting Mail Delivery After Setting Up Forwarding/Redirection</a></li>
+<li><a href="#StopForwarding">Stop Redirecting Emails to Alternate Email Address</a></li>
+</ul><h2><a id="Disclaimer"></a>Email Forwarding and Redirection Disclaimer</h2><p><strong>Important Note</strong>: Faculty and staff can not redirect or auto-forward their Illinois email. Please see this article for more information: <a href="https://answers.uillinois.edu/page.php?id=110048" target="_blank" rel="noopener">Privacy &amp; Cybersecurity, Faculty and Staff Email Auto-forwarding Retirement FAQ</a></p><p>If you choose to forward your email, please be aware that you may encounter the following problems:</p><ul>
+<li><strong>You may not receive all forwarded mail at the desired account.</strong> Due to how Illinois handles spam control and email relay routing, messages redirected outside of Exchange may incorrectly be blocked as spam. Users who decide to forward their email should check their Illinois Exchange account frequently to avoid missing messages.</li>
+<li><strong>You risk violating <a href="https://studentprivacy.ed.gov/ferpa" target="_blank" rel="noopener">FERPA</a> and other regulations.</strong>These laws protect student information or other confidential information from being disclosed to a third-party, which includes companies that provide email services.</li>
+<li><strong>Your other account might be subject to <a herf="https://www.foia.gov/" target="_blank" rel="noopener">Freedom of Information Act (FOIA)</a> requests.</strong> Illinois business records stored in a private email account may render the entire account subject to FOIA requests for searches for relevant documents.</li>
+<li><strong>You may not receive voice mail</strong>. The campus Unified Communications system relies on functionality within your Exchange account to deliver voice mail.</li>
+<li><strong>Technology Services cannot support problems that ensue from forwarding your email.</strong> Due to how email traffic flows into and out of the campus Exchange system, redirecting your email will result in your email being delivered to two separate locations. Official Illinois correspondence and email from <em>any other Exchange user</em> will be delivered to your official Illinois email account (Exchange) regardless of your forwarding settings. You are solely responsible for any consequences resulting from this change.</li>
+</ul><h3>Exception: Graduates and Retirees</h3><p>All students who graduated from Illinois after December 2012 are eligible for email forwarding for life from their Illinois email. For more information on your email account and leaving the university, see <a href="page.php?id=51006" rel="noopener noreferrer" target="_blank">Identity Management, Leaving Campus for Graduating Students</a>.</p><p>All people who retire from Illinois will maintain use of their Exchange mailbox, but will need to access it via the Outlook website or on a mobile device. For more information on retirement, see <a href="page.php?id=47708" rel="noopener noreferrer" target="_blank">Identity Management, Leaving Campus for Faculty and Staff</a>.</p><h2><a id="InboxRules"></a>Inbox Rules</h2><p>You can use inbox rules to automatically perform specific actions on email that arrives in your inbox. For example, you can create rules that will change the importance level of messages as they come in, automatically move them to other folders, or delete them based on certain criteria. For a full rundown of everything you can do with rules, please see <a href="https://support.microsoft.com/en-us/office/manage-email-messages-by-using-rules-in-outlook-c24f5dea-9465-4df4-ad17-a50704d66c59" title="Email Rules" target="_blank" rel="noopener">Manage email messages by using rules in Outlook</a>.</p><h2><a id="EmailRedirection"></a>Forward/Redirect Emails to Another Account</h2><p>While your Exchange mailbox still exists, forwarding and redirecting your email is a 2-step process. It is very important that you follow both steps so that all mail goes where intended. If your mailbox no longer exists or has been deactivated, skip step 2.</p><h3>Step 1: Update your email address in the Electronic Directory Editor (EDE)</h3><ol>
+<li>Navigate to the <a href="https://ede.techservices.illinois.edu/" target="_blank" rel="noopener">Electronic Directory Editor</a> and log in.</li>
+<li>Find the <strong>mail</strong> field and enter the email address you would like to have mail forwarded to.</li>
+<li>To have mail delivered to your Illinois Outlook account, enter your email as <em>YourNetID@mx.uillinois.edu</em></li>
+<li>To have mail delivered to your Illinois Gmail account, enter your email as <em>YourNetID@g.illinois.edu</em></li>
+<li>To have mail delivered to your personal email, simply enter your personal email address</li>
+<li>Click <strong>Apply</strong> to save your settings.</li>
+</ol><h3>Step 2: Set up an inbox rule to forward emails</h3><p>Instructions for setting up inbox rules will vary depending on the version of Outlook that you use:</p><ul>
+<li><a href="https://support.microsoft.com/en-us/office/use-rules-to-automatically-forward-messages-45aa9664-4911-4f96-9663-ece42816d746#id0edbh=web" target="_blank" rel="noopener">Outlook Online (recommended)</a></li>
+<li><a href="https://support.microsoft.com/en-us/office/use-rules-to-automatically-forward-messages-45aa9664-4911-4f96-9663-ece42816d746#id0edbh=newer_versions" target="_blank" rel="noopener">Classic Outlook for Windows</a></li>
+<li><a href="https://support.microsoft.com/en-us/office/use-rules-to-automatically-forward-messages-45aa9664-4911-4f96-9663-ece42816d746#id0edbh=new_outlook" target="_blank" rel="noopener">New Outlook for Windows</a></li>
+</ul><p>Instructions for New Outlook (MacOS):</p><ol>
+<li>With Outlook open, go to <strong>Message</strong> &gt; <strong>Rules</strong> &gt; <strong>Edit Rules...</strong>.</li>
+<li>Click <strong>Add new rule</strong>.</li>
+<li>Enter a descriptive name for your rule. It can be anything you like, but it should be descriptive so you know what it does.</li>
+<li>Under <em>Select a condition</em>, choose <strong>Apply to all messages</strong>.</li>
+<li>Under <em>Select an action</em>, choose <strong>Redirect to</strong>.</li>
+<li>Enter the email address you would like to forward the mail to. It must match what you entered in EDE.</li>
+<li>Click <strong>Save</strong>.</li>
+<li>If you have more than one inbox rule, use the arrow buttons to move this rule to the top.</li>
+</ol><h3>Forwarding rule versus Redirection rule</h3><p>Forwarding changes the Sender to be your Illinois email address so you can easily keep track of forwarded vs non-forwarded messages. Redirection sends all incoming email directly to your redirected email address while keeping the original Sender intact.</p><h2><a id="ForwardAttachment"></a>Forwarding Email Messages as an Attachment</h2><p>A common reason to forward messages as an attachment is to report suspected phishing email. Forwarding as an attachment preserves helpful diagnostic information, which is lost when simply forwarding the email.</p><h3>Outlook Online</h3><ol>
+<li>Click the <strong>New mail</strong> button to create a new message.</li>
+<li>Click and drag the message you want to forward as an attachemnt into the body of your new email.</li>
+<li>Enter the other details of your message like normal (To, Subject, Body, etc.), then click <strong>Send</strong>.</li>
+</ol><h3>Classic Outlook for Windows</h3><ol>
+<li>Select the message you would like to forward.</li>
+<li>Press <strong>Ctrl + Alt + F</strong> to open a new message window with the selected email as an attachment.</li>
+<li>Enter the other details of your message like normal (To, Subject, Body, etc.), then click <strong>Send</strong>.</li>
+</ol><h3>New Outlook for Windows</h3><ol>
+<li>In the message list, select the message you wish to forward.</li>
+<li>Click the drop down arrow underneath <em>Forward</em> on the Home tab.</li>
+<li>Click <strong>Forward as attachment</strong>.</li>
+<li>Enter the other details of your message like normal (To, Subject, Body, etc.), then click <strong>Send</strong>.</li>
+</ol><h3>Outlook for Mac</h3><ol>
+<li>Select the message you would like to forward.</li>
+<li>Press <strong>Ctrl (^) + Command (&#8984;) + J</strong> to open a new message window with the selected email as an attachment.</li>
+<li>Enter the other details of your message like normal (To, Subject, Body, etc.), then click <strong>Send</strong>.</li>
+</ol><h2><a id="Troubleshooting"></a>Troubleshooting Mail Delivery After Setting Up Forwarding/Redirection</h2><p>If you aren't receiving emails where you expect them to show up or not receiving emails at all, start by checking these settings.</p><h3>EDE Mail Delivery</h3><p>Log in to the <a href="https://ede.techservices.illinois.edu/" target="_blank" rel="noopener">Electronic Directory Editor (EDE)</a> and look for the <strong>mail</strong>field. It should be one of the following:</p><ul>
+<li>YourNetID<strong>@mx.uillinois.edu</strong>
+<ul>
+<li>Emails will be delivered to your <a href="https://outlook.office.com/" target="_blank" rel="noopener">Microsoft account (Outlook)</a></li>
+</ul>
+</li>
+<li>YourNetID<strong>@g.illinois.edu</strong>
+<ul>
+<li>Emails will be delivered to your <a href="https://g.illinois.edu/" target="_blank" rel="noopener">Google Apps @ Illinois account (Gmail)</a>.</li>
+</ul>
+</li>
+<li>A non-Illinois <strong>personal email</strong> address</li>
+</ul><h3>Caveats</h3><p>If external email is redirected away from the Illinois mail server (by setting this to anything besides @mx.uillinois.edu), Technology Services will not be able to track what happens to a message afterwards.</p><p>Current staff members are not able to edit their mail forwarding settings, and by default must use their @illinois.edu email address for conducting university business, rather than directing mail elsewhere. More information about this policy can be found here: <a href="page.php?id=110048" rel="noopener noreferrer" target="_blank">Privacy &amp; Cybersecurity, Faculty and Staff Email Auto-forwarding Retirement FAQ</a>.</p><p>Google Apps @ Illinois is only provided as a service to current students, faculty, and staff; others should not use the @g.illinois.edu setting.</p><p>Changes to the EDE <strong>mail</strong> field may take up to 4 hours to sync with the mail server, and will not take effect immediately.</p><h3>Inbox Rules</h3><p>If messages are staying on the Illinois mail server (EDE mail field is @mx.uillinois.edu or @g.illinois.edu) but you are not finding them where you expect, check if you have any inbox rules or filtering set up. Inbox rules can be used to redirect or file away some messages, and may be catching mail you don't expect them to.</p><p>For Microsoft accounts, Outlook's rules can be found here:<a href="https://outlook.office.com/mail/options/mail/rules" target="_blank" rel="noopener">https://outlook.office.com/mail/options/mail/rules</a></p><p>For Google accounts, Gmail's filters can be found here:<a href="https://mail.google.com/mail/u/0/#settings/filters" target="_blank" rel="noopener">https://mail.google.com/mail/u/0/#settings/filters</a></p><p>Email software (such as the installed version of Outlook, Apple Mail, or smartphone applications) can also perform sorting, filtering, or redirection on its own, or its connection to the mail server may fall out of sync. Check the <a href="https://outlook.office.com/" target="_blank" rel="noopener">Outlook web app</a> for missing messages or different contents to see if this is the case. If messages appear in the website but not in your email software, try removing the account from the software and adding it back.</p><h3>Other potential causes</h3><h4>Spam</h4><p>Missing emails may have inadvertently been flagged as spam.</p><ul>
+<li>If you are missing mail from a specific person or vice versa, make sure you add them to your safe senders list. For instructions to add or remove people from your safe senders list, see <a href="page.php?id=67716" rel="noopener noreferrer" target="_blank">Email, Spam Control, Managing Safe and Block Lists</a>.</li>
+<li>If you have attachments on your message, ensure they are not being blocked: <a href="page.php?id=47980" rel="noopener noreferrer" target="_blank">Email, Spam Control, Email or attachment disappears</a>.</li>
+</ul><p>Messages that are marked as spam often end up in your <a href="https://go.illinois.edu/spamdigest" target="_blank" rel="noopener">Proofpoint Spam Digest</a>. Also make sure to check your Deleted, Spam, Junk, etc. folders.</p><h4>Preferred Address</h4><p>If you are a student and you are having issues receiving course emails (e.g. from your instructors), please check that your preferred email address in Self-Service is correct. To check this:</p><ul>
+<li><u>Students</u>
+<ol>
+<li>Navigate to the <a href="https://banner.apps.uillinois.edu/StudentSelfService/ssb/studentCommonDashboard?mepCode=1UIUC" target="_blank" rel="noopener">Student Services page</a>, and sign in.</li>
+<li>Click <strong>Update Personal Information</strong>.</li>
+<li>Confirm your <em>University Assigned Email Address (Preferred)</em> is your NetID@illinois.edu email address.</li>
+<li>If your preferred email address is <em>not</em> your @illinois.edu email, please see <a href="page.php?id=49176" rel="noopener noreferrer" target="_blank">Enterprise, University Assigned, Preferred Email Address</a>.</li>
+</ol>
+</li>
+<li><u>Staff/Faculty</u>
+<ol>
+<li>Navigate to the <a href="https://go.uillinois.edu/myprofile" target="_blank" rel="noopener">My Profile</a> page and click <strong>Access My Profile</strong>.</li>
+<li>Confirm your <em>University email</em> is your NetID@illinois.edu email address</li>
+<li>If your preferred email address is <em>not</em> your @illinois.edu email, please see <a href="page.php?id=49176" rel="noopener noreferrer" target="_blank">Enterprise, University Assigned, Preferred Email Address</a>.</li>
+</ol>
+</li>
+</ul><h4>Still missing emails</h4><p>If you're able to provide the Technology Services Help Desk with a specific example of an email that's gone missing, we may be able to track down whether or not the mail server saw it and what may have happened to it. Contact the Help Desk by email at <a href="mailto:consult@illinois.edu">consult@illinois.edu</a>or by phone at 217-244-7000 and provide the following details:</p><ul>
+<li><strong>Timestamp</strong> the message was sent (or a date and a range of hours, if the exact time is not known).</li>
+<li><strong>Sending address</strong> the message originated from.</li>
+<li><strong>Recipient address</strong> the message was sent to.</li>
+<li><strong>Subject</strong> of the message, if known.</li>
+</ul><div class="kb-class-internal-site">
+<h2>Help Desk Internal:</h2>
+<p>Once you have collected this information about a missing email, please escalate the ticket to <strong>UIUC-TechServices-HD Tier 2</strong></p>
+</div><h3>Email still delivering to Exchange account</h3><p>If you have only set up email forwarding in EDE but your Exchange mailbox still exists, any mail sent by another Illinois Exchange user will ignore any EDE forwarding rules. For example: Exchange user <em>A</em> composes an email in Exchange and uses the "check names" feature to send an email to user <em>B</em>. User <em>B</em> has an Exchange account and forwards all their mail to Gmail via EDE. The email from User <em>A</em> will be delivered to User <em>B's</em> Exchange account. In order for all mail to be delivered to the account in EDE, you will need to set up an <a href="#EmailRedirection">inbox rule</a>.</p><h2><a id="StopForwarding"></a>Stop Redirecting Emails to Alternate Email Address</h2><p>Illinois accounts can be configured to redirect incoming emails to Microsoft Exchange, Google Apps, or a personal email address. This setting is found in the Electronic Directory Editor:</p><ol>
+<li>Navigate to the <a href="https://ede.techservices.illinois.edu/" target="_blank" rel="noopener">Electronic Directory Editor</a> and log in.</li>
+<li>Find the <strong>mail</strong> field and enter YourNetID@<strong>mx.uillinois.edu</strong>. It is important to use the @mx.uillinois.edu domain; if you use @illinois.edu, emails will not be delivered correctly.</li>
+<li>Click <strong>Apply</strong> to save your settings.</li>
+</ol><p>Please note that changes made in EDE can take up to 4 hours to propagate to the email relays. Emails may not be delivered correctly until your settings have synced. More information about email forwarding and redirection using EDE can be found here:<a href="page.php?id=47593" rel="noopener noreferrer" target="_blank">Email, How to set up email forwarding</a>.</p><p>You will also need to delete any Inbox rules that are set to forward or redirect mail to another email address: <a href="https://support.microsoft.com/en-us/office/manage-email-messages-by-using-rules-in-outlook-c24f5dea-9465-4df4-ad17-a50704d66c59" target="_blank" rel="noopener">Manage email messages by using rules in Outlook</a>.</p><p>Staff members are not allowed to redirect email, and will be unable to edit the <strong>mail</strong> field in EDE. If you are a staff member and need to modify this to disable mail forwarding, please contact the Technology Services Help Desk by email at <a href="mailto:consult@illinois.edu">consult@illinois.edu</a> or by phone at 217-244-7000. See this article for more information: <a href="page.php?id=110048">Privacy &amp; Cybersecurity, Faculty and Staff Email Auto-forwarding Retirement FAQ</a>.</p>
+</div></div></div><br style="clear:both;"><hr class="kbhr1"><div class="doc-info"><div class="doc-attr keywords"><div class="doc-attr-name">Keywords:</div><div class="doc-attr-value"><span id="kb-page-keywords">office, Email, Office 365, office, forwarding, forward, redirect, redirection, EDE, rules, inbox, outlook, OWA, delete, rule, end, forwarding, missing, preferred, spam, troubleshooting, disclaimer, attachment, exchange, not received, not, received, didn't get email, didn't, get, email</span>&nbsp; <span id="suggestk-button"><button class="feedback-btn-link" onclick="suggestK(150155,'Office+365%2C+Email+Rules%2C+Forwarding%2C+Redirection%2C+and+Troubleshooting','office%2C+Email%2C+Office+365%2C+office%2C+forwarding%2C+forward%2C+redirect%2C+redirection%2C+EDE%2C+rules%2C+inbox%2C+outlook%2C+OWA%2C+delete%2C+rule%2C+end%2C+forwarding%2C+missing%2C+preferred%2C+spam%2C+troubleshooting%2C+disclaimer%2C+at');">Suggest keywords</button></span><div id="suggestk" aria-expanded="false" style="clear:both; float:left; width:50%;"></div><div id="ks-thank-you" role="status" aria-live="polite" aria-hidden="true" tabindex="-1" style="display:none;">We appreciate your suggestion. Thank you!</div></div></div><div class="doc-attr id"><div class="doc-attr-name">Doc ID:</div><div class="doc-attr-value">150155</div></div><div class="doc-attr owner"><div class="doc-attr-name">Owned&nbsp;by:</div><div class="doc-attr-value"><span class="doc-attr-value-owner-name">Office 365 G. in </span>University of Illinois Technology Services</div></div><div class="doc-attr created"><div class="doc-attr-name">Created:</div><div class="doc-attr-value">2025-04-28</div></div><div class="doc-attr updated"><div class="doc-attr-name">Updated:</div><div class="doc-attr-value">2025-08-04</div></div><div class="doc-attr sites"><div class="doc-attr-name">Sites:</div><div class="doc-attr-value"><a href="https://answers.uillinois.edu/illinois/150155">UniversityofIllinoisTech Serv-external</a>, UniversityofIllinoisTechServ-internal</div></div><div class="doc-attr sites"><div class="doc-attr-name">External link:</div><div class="doc-attr-value"><span id="extLink">https://answers.uillinois.edu/illinois/150155</span> <span class="kbs-copy-icon" onclick="copyElTextToClipboard('extLink')"><img alt="Copy external link" src="/css/svg/copy-14.svg"><span class="kbs-copy-tooltip extLink">Copy</span></span></div></div><div class="doc-attr feedback"><div class="doc-attr-value"><input type="hidden" id="did" value="150155"><span id="vote-yes"><input type="button" id="helpfulBtn" class="feedback-btn-yes" value="Helpful"></span> <span id="count-yes">0</span> &nbsp; <span id="vote-no"><input type="button" id="unhelpfulBtn" class="feedback-btn-no" value="Unhelpful"></span> <span id="count-no">0</span> &nbsp; <script>if(document.getElementById("helpfulBtn")){document.getElementById("helpfulBtn").addEventListener("click", yesVote);}if(document.getElementById("unhelpfulBtn")){document.getElementById("unhelpfulBtn").addEventListener("click", noVote);}</script> <span class="doc-comment"><a class="feedback-btn-link" href="feedback.php?action=2&amp;help=comment&amp;id=150155">Comment</a></span> <span class="email-to-cust"><a class="feedback-btn-link" href="feedback.php?action=2&amp;help=email&amp;id=150155">Email to customer</a></span> <span class="suggest-doc3"><a class="feedback-btn-link" href="feedback.php?action=2&amp;help=suggest&amp;id=150155">Suggest new doc</a></span> <span class="sub-to-change"><a class="feedback-btn-link" href="feedback.php?action=2&amp;help=subscribe&amp;id=150155">Subscribe to changes</a></span> <span id="fav-doc"><input type="button" class="boxlink" value="Mark as favorite" onclick="markAsFavDoc(150155,13);"></span><span id="feedback-thank-you"></span></div></div></div><div class="topic-footer"> <br></div></main></div><div class="col span_middle3_3_of_3"><aside role="complementary" aria-labelledby="KBhelp"><div class="kbrightlinks"><span id="KBhelp" class="head">KB help</span><ul id="kbrightul0"><li><a href="/kbAdmin/index.php">KB admin tools</a></li><li><a href="/kbGuide/">KB user guide</a></li><li><a href="/kbGuide/page.php?id=5235">How to create a document</a></li><li><a href="/kbGuide/#FAQ">Frequently asked questions</a></li></ul></div></aside></div></div></div><footer><div id="copyright" role="contentinfo">Copyright © 2026 | <a href="78963" target="_blank" title="Privacy Statement">Privacy</a>
+<br><div id="view-toggle"><p>User: ae42@illinois.edu · <a href="search.php?q=showmyfavoritedocs">Favorites</a>  · <a href="/Shibboleth.sso/Logout">Sign out</a><br></p></div></div></footer></div></div><script type="text/javascript">$(function(){
+   
+
+   $(".cloakToggle").click(function(){
+       
+       
+       
+        $elt=$(this).parent().nextAll(".cloak:first");
+        $toggleimg=$(this).children(":first");
+       
+              if($elt.css("display")=="none"){
+                $toggleimg.removeClass("cloakDefaultOpen");
+                $toggleimg.addClass("cloakDefaultClose");
+              $elt.css("display","block");
+              $elt.css("border","double");
+              $elt.css("padding","15px");
+              }else{
+                 $toggleimg.removeClass("cloakDefaultClose");
+                 $toggleimg.addClass("cloakDefaultOpen");
+              $elt.css("display", "none");
+              $elt.css("border", "none")
+              }
+    }).focus(function() {
+    $(this).bind('keydown', 'space', function(e){
+      if(e.which==32){  
+        $(this).trigger('click')
+        e.preventDefault();
+      }
+    });
+
+}).blur(function() {
+    $(this).unbind('keydown');
+
+}).attr("tabIndex",0);
+
+});</script><script type="text/javascript" src="/cssjs/kb-doc-collapsing-panels.js"></script><script>if(document.getElementsByTagName("a")){let els=document.getElementsByTagName("a");for(let i=0;i<els.length;i++){els[i].addEventListener("click", lnks);}}</script></body></html>

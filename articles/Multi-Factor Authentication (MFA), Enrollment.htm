@@ -1,0 +1,485 @@
+<!DOCTYPE html><html lang="en-US"><head><script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-5MRHB7J');</script><title>Multi-Factor Authentication (MFA), Enrollment</title><script src="https://code.jquery.com/jquery-1.11.2.min.js"></script><style>.expand-control-icon::before{  content:url('/graph/plus.png');}.expand-content{  display:block;  opacity: 1;}.expand-hidden{ display: none; opacity: 0;} .cloakDefaultClose{    background-image: url(/images/group180/shared/wiki/navigate_down_10.gif);    width: 10px;    height: 10px;    display: inline-block;    }.cloakDefaultOpen{    background-image: url(/images/group180/shared/wiki/navigate_right_10.gif);    width: 10px;    height: 10px;    display: inline-block;}  </style><script src="https://code.jquery.com/jquery-1.11.2.min.js"></script><script>jQuery(document).on('click', '.expand-control', function(event) {              $elt=jQuery(this).next('.expand-content');              if($elt.hasClass("expand-hidden")){              $elt.removeClass("expand-hidden");              }else{              $elt.addClass("expand-hidden");              }                  });</script><meta http-equiv="content-type" content="text/html; charset=utf-8"><meta name="description" content=""><meta name="keywords" content="KnowledgeBase, knowledge base, universities, colleges, higher education, knowledge sharing, knowledge collaboration, technical support self-service solutions"><meta name="application-name" content="University KnowledgeBase"><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="/css/kbs-base.js?v=26292" type="text/javascript"></script><link rel="stylesheet" type="text/css" media="screen" href="/css/froala-editor@3.2.2/froala_style.min.css"><link rel="stylesheet" type="text/css" media="screen" href="/css/froala-editor@3.2.2/froala_override.css"><link rel="stylesheet" type="text/css" media="screen" href="/css/tinymce@5/content.css"><link rel="stylesheet" type="text/css" media="screen" href="/css/kbs-base.css?v=26292"><link rel="stylesheet" type="text/css" media="screen" href="/css/default_layout1.css?v=26292"><style>/* 
+This "Custom CSS Four" file was originally copied from the External Custom CSS One file present on answers.uillinois.edu/illinois/ in December 2023.
+
+Custom CSS One is being left in place for now, so that switching from the new Four to the old One is relatively simple in case of breakage.
+
+Prior to this file's creation, Custom CSS Four held a copy of the unimplemented cloakDefaultClose and cloakDefaultOpen code still found in Internal's Custom CSS Two.
+ */
+
+/*-----*/
+
+/* un-clicked links */
+.kbleftlinks a, .kbrightlinks a, a, #qlinks a, #qcats a, #resource-links a, #news a, #topDocs a, #recentDocs a, .custom a, #cat-nav ul li a  {color:#2F568C; text-decoration:underline;}
+
+/* hovered-over links */
+.kbleftlinks a:hover, .kbrightlinks a:hover, a:hover, #qlinks a:hover, #qcats a:hover, #resource-links a:hover, #news a:hover, #topDocs a:hover, #recentDocs a:hover, .custom a:hover, #cat-nav ul li a:hover {color:#C84113;}
+
+/* already-clicked links */
+.kbleftlinks a:visited, .kbrightlinks a:visited, a:visited, #qlinks a:visited, #qcats a:visited, #resource-links a:visited, #news a:visited, #topDocs a:visited, #recentDocs a:visited, .custom a:visited, #cat-nav ul li a:visited {color:#00779F;}
+
+/* section headings */
+.kbleftlinks .head, .kbrightlinks .head, #qlinks .head, #qcats .head, #resource-links .head,  #news h2, #topDocs h2, #recentDocs h2, .custom h2, #cat-nav ul li a h2 {background-color:#FF5F05; color:#252525;}
+.kbleftlinks ul, .kbrightlinks ul, #qlinks ul, #qcats ul, #resource-links ul {border-left-color:#FF5F05; border-right-color:#FF5F05; border-bottom-color:#FF5F05;}
+.kbleftlinks li, .kbrightlinks li, #qlinks li, #qcats ul, #resource-links li {border-bottom-color:#13294B;}
+
+/* main header */
+#top-links {background-color:#FF5F05;}
+#top-links-int {background-color:#080808;}
+#logo-search, #search-form {background:#13294B;}
+
+/* 'Site Map' and other header buttons */
+#search-form a {color: #0E0F20 !important; border: 1px solid #0E0F20 !important; background-color:#F4BCA9;}
+
+
+/* unknown or unimplemented */
+.kbleftlinks a, .kbrightlinks a, #qlinks a, #qcats a, #resource-links a, #cat-nav ul li a {text-decoration:none;}
+a[name] {color:inherit; background-color:inherit; text-decoration:inherit;}
+a.boxlink, input.boxlink {font-size:11px; color:#365899; background-color:#eceef5; text-decoration:none; padding:0px 6px 0px 6px; border:1px solid #cad4e7; margin-left:2px; margin-bottom:5px; text-align:right; border-radius:4px;}
+
+/* add-ons */
+.kbleftlinks ul {border:0;}
+
+.kbleftlinks li {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+nav ul li {
+  margin: 0;
+  padding: .5em 0px .5em 0px;
+  list-style-type: none;
+  font-size: 1.2em; }
+
+nav ul li a {
+  display: block; }
+
+nav ul li a:hover { 
+color: #A9852A; 
+  text-decoration: none; }
+
+.offscreen {
+    left: -200em;
+    position: absolute;
+    top: -20em; }
+
+.status {
+  background: url(/images/group180/shared/logo/info.png) left top no-repeat;
+  background-size: 1.5em;
+ }
+
+.ticket {
+  background: url(/images/group180/shared/logo/partners.png) left top no-repeat; 
+  background-size: 1.5em;
+}
+
+.email { 
+  background: url(/images/group180/shared/logo/email.png) left top no-repeat; 
+  background-size: 1.5em;
+}
+
+.call {
+  background: url(/images/group180/shared/logo/call.png) left top no-repeat; 
+  background-size: 1.5em;
+}
+
+.add-contact h3 {
+  font-family="Montserrat," sans-serif; 
+  font-size: 16px;
+  font-weight: normal;
+  margin: 0;
+  padding-bottom: 8px; }
+
+/*end image-bulleted left nav styles */
+
+div.rightbox
+{
+float: right;
+padding: .5em;
+width: 15%;
+border: .1em solid grey;
+}
+
+
+/* Styling the content links in the Lync left nav */
+#middle-sect3 .kbleftlinks:first-child a 
+{
+	font-size: 1.2em;
+}
+
+/* Making the headlines easier to scan for */
+#maincontent ul
+{
+	display:table;
+}
+
+#maincontent
+{
+	padding-left:2em;
+}
+#maincontent h1, #maincontent h2, #maincontent h3, #maincontent h4
+{
+	margin-left:-1.5em;
+}
+
+/* Table styling from Keith Hays */
+#maincontent table 
+{
+border-collapse: collapse;
+}
+#maincontent td, #maincontent th 
+{ 
+border: 1px solid #000
+}
+#maincontent th 
+{ 
+background-color: #eee;
+}
+
+/* Note, warning, alert, info box styles based on the wiki visuals */
+.note-box, .tip-box, .warning-box, .info-box, .code-block-box, .page-alert-box {
+    border-color: #be7;
+    border-radius: 5px;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.1);
+    margin: 10px 0;
+    overflow: hidden;
+    padding: 1rem;
+}
+.note-box {
+	background-color: #ffffce;
+	margin: 10px 0em;
+	padding: 1rem;
+
+}
+.note-box p:first-child::before {
+    content: url("/images/group180/shared/images/note-warning-mini.png");  
+    margin-right: 10px;
+}
+
+.tip-box {
+	background-color: #dfd;
+	margin: 10px 0em;
+	padding: 1rem;
+}
+.tip-box p:first-child::before {
+    content: url("/images/group180/shared/images/note-check-mini.gif");  
+    margin-right: 10px;
+}
+
+.warning-box {
+	background-color: #fcc;
+	margin: 10px 0em;
+	padding: 1rem;
+}
+
+.warning-box p:first-child::before {
+    content: url("/images/group180/shared/images/note-forbidden-mini.gif");  
+    margin-right: 10px;
+}
+
+
+.info-box {
+    background-color:#BFC9D9;
+}
+.info-box p:first-child::before {
+    content: url("/images/group180/shared/images/note-info-mini.gif");  
+    margin-right: 10px;
+}
+.code {
+    font-family: monospace;
+    font-size: 13px;
+    line-height: 1.1em;
+}
+.code-block-box {
+    background-color: #ccc;
+    border: 1px dashed #666;
+    font-family: monospace;
+    font-size: 13px;
+    line-height: 1.1em;
+}
+.page-alert-box {
+    background: url("/images/group180/shared/images/note-info.gif") no-repeat scroll left top #ffffce;
+    border-color: #be7;
+    padding-left: 50px;
+}
+.checklist-box {
+    margin-bottom: 10px;
+    margin-left: 10px;
+}
+.checklist-box .checked {
+    background: url("/images/group180/shared/images/checkbox-checked.gif") no-repeat scroll left center rgba(0, 0, 0, 0);
+    margin-bottom: 10px;
+    padding-left: 25px;
+}
+.checklist-box .unchecked {
+    background: url("/images/group180/shared/images/checkbox-trans.gif") no-repeat scroll left center rgba(0, 0, 0, 0);
+    margin-bottom: 10px;
+    padding-left: 25px;
+}
+.checklist-box .crossed {
+    background: url("/images/group180/shared/images/checkbox-red-x.gif") no-repeat scroll left center rgba(0, 0, 0, 0);
+    margin-bottom: 10px;
+    padding-left: 25px;
+}
+
+.left-menu { /* make sure this class comes after the alert-box classes */
+	margin-left: 21%;
+}
+
+/* Classtech Photo Templates */
+figure.roomphoto {
+   max-width: 500px;
+   border-style: solid;
+   border-width: 1px;
+}
+
+img.roomphoto {
+    border-bottom: solid 1px;
+}
+
+figcaption.roomphoto {
+    padding: 12px;
+}
+
+img.tablephoto {
+    height: 64px;
+    border-radius: 5px;
+}
+
+/* new callouts */
+div.orangecallout {
+    border-style: solid; 
+    border-color: #ff5f05; 
+    background-color: #ffcc99; 
+    padding: 22px;
+}</style><link rel="stylesheet" type="text/css" media="screen" href="/css/uw-buttons.css"><link rel="stylesheet" type="text/css" media="print" href="/css/print.css"></head><body><noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5MRHB7J" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript><div id="skip-nav"><a href="#maincontent">Skip navigation</a></div><div id="body-container"><header role="banner"><div id="top-links-int"><div class="section group top"><div class="col span_top_1_of_3"><span class="hidden">Multi-Factor Authentication (MFA), Enrollment</span></div><div class="col span_top_2_of_3"><div id="top-left-links"><ul><li class="first"><a href="http://illinois.edu/">University of Illinois</a></li></ul></div></div><div class="col span_top_3_of_3"><div id="top-right-links"><ul><li class="first"><a href="http://techservices.illinois.edu/services">Services & Info</a></li><li><a href="http://techservices.illinois.edu/contact">Contact Us</a></li><li><a href="/Shibboleth.sso/Logout">Sign out</a></li></ul></div></div></div></div><div id="logo-search"><div class="section group logo-search"><div class="col span_logo-search_1_of_2"><div id="group-logo"><a href="./"><img src="/images/group180/logo/CIO-Dark.png" alt="University of Illinois Internal KB" width="375" height="80"><span class="group-name-hide">University of Illinois Technology Services</span></a></div></div><div class="col span_logo-search_2_of_2"><div id="search-form" class="upper" role="search"><form accept-charset="UTF-8" method="get" action="search.php" title="Search"><span id="resultc" role="status" aria-live="polite"></span><br><label for="q" class="hidden">Search term</label><input class="inputBox" id="q" type="text" name="q" placeholder="Search the KB..." value="" size="36" maxlength="140" onkeyup="resultC(this.value)" aria-controls="resultc" aria-autocomplete="both" > <label for="cat" class="hidden">Select topic</label><select class="selectBox kb-dropdown-fixed-300m" id="cat" name="cat" onchange="this.form.submit();"><option value="0">All Topics</option><option value="4561">Accounts and passwords</option><option value="4573">&nbsp; Password manager</option><option value="4672">CCME</option><option value="4562">Communication and collaboration</option><option value="7361">&nbsp; cPanel web hosting</option><option value="6284">&nbsp; DigitalsSignage </option><option value="4581">&nbsp; Exchange</option><option value="4582">&nbsp; Google Apps @ Illinois</option><option value="9935">&nbsp; Illinois mobile app</option><option value="4579">&nbsp; Illinois wiki</option><option value="5287">&nbsp; Kaltura</option><option value="4583">&nbsp; Lync / Skype for Business</option><option value="5169">&nbsp; Office 365</option><option value="4584">&nbsp; Publish.illinois.edu (PIE)</option><option value="4586">&nbsp; U of I Box</option><option value="8615">&nbsp; ZOOM</option><option value="4563">Computing infrastructure</option><option value="5987">&nbsp; Amazon Web Services</option><option value="4564">Help and training</option><option value="4596">&nbsp; Accessibility outreach </option><option value="4600">&nbsp; Help Desk</option><option value="14322">&nbsp; KnowledgeBase</option><option value="4608">&nbsp; OnSite consulting</option><option value="4613">&nbsp; Status</option><option value="4615">&nbsp; Training services (FAST 3)</option><option value="4616">&nbsp; Usability consulting</option><option value="14016">Human Resources</option><option value="14017">&nbsp; Training & development</option><option value="5700">Known errors</option><option value="4565">Networking</option><option value="4619">&nbsp; Virtual private networking (VPN)</option><option value="4627">&nbsp; Wireless</option><option value="14500">&nbsp; &nbsp; Wireless KB Rewrite</option><option value="4566">Printing and software</option><option value="4631">&nbsp; WebStore</option><option value="4567">Safety and security</option><option value="5699">Swanlund</option><option value="4568">Teaching and learning</option><option value="8487">&nbsp; Canvas@illinois.edu</option><option value="4651">&nbsp; Illinois Compass 2G</option></select> <label for="aud" class="hidden">Select audience</label><select class="selectBox kb-dropdown-fixed-300m" id="aud" name="aud" onchange="this.form.submit();"><option value="0">All Audiences</option><option value="100">Undergraduate students</option><option value="101">Graduate students</option><option value="102">Faculty and staff</option><option value="99">IT Pros</option></select> <input class="search" type="submit" value="SEARCH"></form></div><script>if(document.getElementsByClassName("search")){document.getElementsByClassName("search")[0].addEventListener("click", searchBtn);}</script></div></div></div></header><div id="container"><div id="middle-sect3"><div class="section group middle-sect3"><div class="col span_middle3_1_of_3"><nav role="navigation" aria-labelledby="Quicklinks"><div class="kbleftlinks"><span id="Quicklinks" class="head">Quick links</span><ul id="kbleftul0"><div class="fr-element fr-view"><div class="print-doc-body"><div class="kbleftlinks"><nav>
+<h2 class="offscreen">Help Options</h2>
+<ul>
+<li><a href="http://status.illinois.edu/" class="status">&nbsp; &nbsp; &nbsp;Check status</a></li>
+<li><a href="https://help.uillinois.edu/TDClient/42/UIUC/Home/" class="ticket">&nbsp; &nbsp; &nbsp;Get help</a></li>
+<li><a href="mailto:consult@illinois.edu" class="email">&nbsp; &nbsp; &nbsp;Email the Help Desk</a></li>
+<li><a href="tel:+12172447000" class="call">&nbsp; &nbsp; &nbsp;Call the Help Desk<br />&nbsp; &nbsp; &nbsp;(217) 244-7000</a></li>
+<li><span><a href="https://appserv7.admin.uillinois.edu/FormBuilderSurvey/Survey/uiuc_technology_services/help_desk/submit_a_suggestion/" target="_blank" title="submit" rel="noopener">Submit a suggestion</a></span></li>
+</ul>
+</nav><!-- commenting out content that will be duplicated above, but leaving in place in case the area and styling wants to be used for other content
+
+<div class="add-contact clearfix">
+            	<h3><br /></h3></div><div class="add-contact clearfix">
+            </div>
+            <div class="add-contact clearfix">    
+                <h3>Urbana-Champaign</h3> 
+                	<div class="campuses">
+	                	<a href="https://techservices.illinois.edu/get-help/help-desk">Technology Services at Illinois</a><br />
+	                	<a href="tel:+12172447000">(217) 244-7000</a><br />
+						<a href="mailto:consult@illinois.edu">consult@illinois.edu</a></div>
+--></div></div></div></ul></div></nav></div><div class="col span_middle3_2_of_3"><main id="maincontent" role="main"><div id="page-content" role="article"><div class="fr-element fr-view"><h1 class="title">Multi-Factor Authentication (MFA), Enrollment</h1><div style="float:right;text-align:right;padding:1px;border-radius:2px;"> <input class="boxlink doc-action" type="submit" value="Show changes" onclick="window.open('resultc.php?action=7&amp;id=65947','Show Changes','scrollbars=yes,resizable=yes,titlebar=no,menubar=no,location=no,directories=no,status=no,width=800,height=780');return false;"> <a class="boxlink doc-action" href="/kbAdmin/document.php?group_id=180&amp;openEditor=1&amp;id=65947" target="_blank" rel="noopener">Edit page</a></div><div class="doc-summary">Step by Step guide on multi-factor authentication (MFA) self-enrollment.</div><div class="doc-body"><!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd">
+<p>For more information about multi-factor authentication and how it protects your university account, see our article here: <a href="page.php?id=65971" rel="noopener noreferrer" target="_blank">Multi-Factor Authentication (MFA), Introduction</a>.</p><p>The first time you log into MFA-protected University website or service, you will be asked to enroll your account and set up a device.&nbsp;</p><h2><span style="text-decoration: underline;">Choosing a Device</span></h2><ol>
+<li><strong><span style="text-decoration: underline;">Duo Mobile App&nbsp;</span></strong>&nbsp;- It is strongly recommended that you use the smartphone that you already own during enrollment. This will allow you to use the Duo Mobile app (available on <a href="https://itunes.apple.com/us/app/duo-mobile/id422663827?mt=8" title="Duo for iOS" target="_blank" rel="noopener">iOS</a> and <a href="https://play.google.com/store/apps/details?id=com.duosecurity.duomobile&amp;hl=en" title="Duo for Android" target="_blank" rel="noopener">Android</a>) for authentication. With the Duo Mobile app, you can simply receive a push notification to approve authentication requests, instead of typing in a code.
+<ul>
+<li>You can use a tablet in lieu of a smartphone.</li>
+<li>One advantage of using the Duo Mobile app is that you can receive push notifications over Wi-Fi. This is helpful when you're in an area where you cannot get a cellular signal, or when traveling abroad.</li>
+<li>You can also use the Duo Mobile app even if you are offline and have no access to data, via the Duo Mobile passcode option.</li>
+</ul>
+</li>
+<li><span style="text-decoration: underline;"><strong>Hardware Token / Security Key</strong></span> - These can be a good option if you do not want to use your smartphone for authentication. Information on hardware tokens can be found at this help article: <a href="page.php?id=72159" rel="noopener noreferrer" target="_blank">Multi-Factor Authentication (MFA), Hardware Tokens and Security Keys</a>.
+<ul>
+<li>Staff members can inquire with their department to see if a hardware token can be purchased for them.</li>
+<li>The Duo Mobile Prompt adds support for FIDO2/WebAuthn security keys. This enables users to bring their own, although it is the user's responsibility to ensure <a href="https://guide.duo.com/universal-prompt#security-key" title="Duo support article on security keys" target="_blank" rel="noopener">compatibility</a>.</li>
+<li>Hardware tokens and security keys can also be used while offline.</li>
+</ul>
+</li>
+</ol><h2><span style="text-decoration: underline;">Enrollment</span></h2><p>There are two ways to enroll in multi-factor authentication:</p><h2 class="panel-head">NetID Center</h2><div class="panel-content">
+<h4><span style="text-decoration: underline;">Instructions</span></h4>
+<ol>
+<li>Navigate to the NetID Center (<a href="https://identity.uillinois.edu">https://identity.uillinois.edu</a>) and log in.
+<ol style="list-style-type: lower-alpha;">
+<li>If your account is already enrolled in MFA, you will need to authenticate with one of your existing devices. If you run into issues or do not have your device, please see this help article for more information: <a href="page.php?id=85687" rel="noopener noreferrer" target="_blank">Multi-Factor Authentication (MFA), Troubleshooting</a>.</li>
+</ol>
+</li>
+<li>Once you're logged in, make sure that the email address listed under Recovery Settings is still correct. This email address can be used to get bypass codes in case you cannot authenticate using your devices in the future.</li>
+<li>Click on 'Set up 2FA'.</li>
+<li><strong>If you are not on campus and connected via the campus network: </strong>You will be shown a screen with the heading &ldquo;<strong><span style="color: #e03e2d;">(!) Must be connected to the University network to register</span></strong>&rdquo; &ndash; <span style="text-decoration: underline;">you will still be able to enroll</span>, but you will need to confirm your identity by way of one of your recovery options:
+<ol style="list-style-type: lower-alpha;">
+<li>Click the blue &ldquo;Get registration code&rdquo; button below the &lsquo;Option 2&rsquo; heading.</li>
+<li>Select one of the presented pieces of contact information, which should match the password recovery options confirmed in step 2.</li>
+<li>You will receive a 6-digit &ldquo;UI Verify Registration Code&rdquo; there. Enter the numbers at the &ldquo;Enter registration code&rdquo; box on the next screen.</li>
+</ol>
+</li>
+<li>You will be taken to the &ldquo;Device Setup: Add a Device&rdquo; screen. Select the type of device you are intending to use for authentication:
+<ol style="list-style-type: lower-alpha;">
+<li><strong>Smartphone (recommended)</strong> should be selected for any device with a phone number</li>
+<li><strong>Tablet</strong> should be selected for devices that do not have a phone number but can install the Duo Mobile app.</li>
+<li><strong>Hardware token</strong> should be selected for MFA token devices purchased from the University WebStore; more detailed instructions here: <a href="page.php?id=72159" rel="noopener noreferrer" target="_blank">Multi-Factor Authentication (MFA), Hardware Tokens and Security Keys</a>.</li>
+</ol>
+</li>
+<li>Device dependent instructions below.</li>
+</ol>
+<h2 class="panel-head">Smartphone</h2>
+<div class="panel-content">
+<p><span style="font-family: Arial;">If enrolling a phone, enter your phone number and click <strong>Yes&nbsp;</strong>you want to use the Duo Mobile App, then <strong>Continue</strong>.&nbsp;</span></p>
+<p><span style="font-family: Arial;"> If you do not want to provide your phone number when configuring your smartphone, you can hit the back button and set it up as a tablet. With this option you will only be able to receive push notifications or generate passcodes via the Duo Mobile App. </span></p>
+<p><span style="font-family: Arial;"><span><img src="/images/group180/shared/IAM/AITS-Duo-NoCall-AddDevice2.png" title="Add a new device (phone number)" alt="Add a new device (phone number)" class="fr-fic fr-dii" width="477" height="486"></span><br></span></p>
+<p><span style="font-family: Arial;">4. Type of Device Platform (if applicable)</span></p>
+<p><span style="font-family: Arial;">Select your device platform, then click <strong>Continue.</strong></span></p>
+<p><span style="font-family: Arial;"><span><img src="/images/group180/shared/IAM/self_enroll_4.jpg" title="Device Platform" alt="Device Platform" class="fr-fic fr-dii" width="497" height="370"></span> </span></p>
+<p><span style="font-family: Arial;">&nbsp;</span></p>
+<p><span style="font-family: Arial;">5. Installing and Activating Duo Mobile</span></p>
+<p><span style="font-family: Arial;">Duo Mobile is an app that runs on your smartphone or tablet and helps you authenticate quickly and easily. You can still authenticate via </span><span style="font-family: Arial;">text message without it, but for the best experience we recommend Duo Mobile.</span></p>
+<ul>
+<li><span style="font-family: Arial;">Search for Duo Mobile in your app store.</span></li>
+<li><span style="font-family: Arial;">Download the app.</span></li>
+<li><span style="font-family: Arial;">Select <strong>"OK"</strong> when asked if Duo Mobile can send push notifications.</span></li>
+<li><span style="font-family: Arial;">Select <strong>Add Account</strong></span></li>
+<li><span style="font-family: Arial;">Once the app is installed, click <strong>I have Duo Mobile installed</strong>.</span></li>
+</ul>
+<p><span style="font-family: Arial;"><img src="/images/group180/shared/IAM/self_enroll_5.jpg" title="Duo Mobile App" alt="Duo Mobile App" class="fr-fic fr-dii" width="499" height="392"></span></p>
+<p><span style="font-family: Arial;">&nbsp;</span></p>
+<p><span style="font-family: Arial;">6. Activate Duo Mobile</span></p>
+<p><span style="font-family: Arial;">&nbsp;</span></p>
+<h4 class="panel-head"><span style="font-family: Arial;">A) &nbsp;Using phone camera for Activation</span></h4>
+<div class="panel-content">
+<p><span style="font-family: Arial;"> Follow the instructions shown on the screen to open Duo Mobile on your device, tap the '+' button, and scan the barcode on your screen with your camera. </span></p>
+<p><span style="font-family: Arial;"><span> &nbsp;<img src="/images/group180/shared/IAM/self_enroll_6a.jpg" title="activate duo mobile" alt="activate duo mobile" class="fr-fic fr-dii" width="499" height="423"><br></span> </span></p>
+<p><span style="font-family: Arial;"><span> &nbsp;You are now successfully enrolled. &nbsp;If you have more than one device enrolled, you will be asked if you would like to make this device your favorite. &nbsp;If it is your favorite, it will show first when authenticating. <br></span> </span></p>
+<h3><span style="font-family: Arial;"><a class="nameanchor" name="NoCamera" title="NoCamera"></a>&nbsp; <br></span></h3>
+</div>
+<h4 class="panel-head"><span style="font-family: Arial;">B) &nbsp;If you opt not to use your phone's camera for activation</span></h4>
+<div class="panel-content">
+<p><span style="font-family: Arial;">Select <strong>"Or have an activation link email to you instead"</strong></span></p>
+<h3><span style="font-family: Arial;"> &nbsp; <span> &nbsp;<img src="/images/group180/shared/IAM/activation2.jpg" title="activation email" alt="activation email" class="fr-fic fr-dii" width="308" height="261"><br></span> &nbsp; </span></h3>
+<p><span style="font-family: Arial;">Enter your email address and select <strong>Send email</strong></span></p>
+<p><span style="font-family: Arial;"><span> &nbsp;<img src="/images/group180/shared/IAM/activation3.jpg" title="enter email" alt="enter email" class="fr-fic fr-dii" width="302" height="207"><br></span> </span></p>
+<p><span style="font-family: Arial;">Below is an example of the email you will be sent. &nbsp;You should open this email on your smartphone by clicking the link or pasting/typing the link in to your smartphones broswer URL bar.</span></p>
+<p><span style="font-family: Arial;"><span><img src="/images/group180/shared/IAM/8Bs_email2_new.jpg" alt="" class="fr-fic fr-dii" role="presentation" width="726" height="117"></span><br></span></p>
+<p><span style="font-family: Arial;"><span>Select <strong>Open</strong></span> </span></p>
+<p><span style="font-family: Arial;"><span> &nbsp;<img src="/images/group180/shared/IAM/activation4.jpg" title="duo mobile" alt="duo mobile" class="fr-fic fr-dii" width="301" height="312"><br></span> </span></p>
+<p><span style="font-family: Arial;">Tap Save on the next screen.</span></p>
+<p><span style="font-family: Arial;">University of Illinois should appear under the Duo Mobile App</span></p>
+<p><span style="font-family: Arial;"><span> &nbsp;<img src="/images/group180/shared/IAM/activation5.jpg" title="activation" alt="activation" class="fr-fic fr-dii" width="298" height="197"><br></span> </span></p>
+<span style="font-family: Arial;"><br></span>
+<p><span style="font-family: Arial;"><span> &nbsp;You are now successfully enrolled. &nbsp;If you have more than one device enrolled you will be asked if you would like to make this device your favorite. &nbsp;If it is your favorite it will show first when authenticating.&nbsp;</span></span></p>
+</div>
+</div>
+<h2 class="panel-head">Tablet</h2>
+<div class="panel-content">
+<p><span style="font-family: Arial;">Choose the type of tablet you are adding. </span></p>
+<p><span style="font-family: Arial;"> Tablets will be iOS or Android. </span></p>
+<p><span style="font-family: Arial;"> &nbsp;<img src="/images/group180/shared/IAM/addtablet.png" alt="" class="fr-fic fr-dii" role="presentation" width="503" height="360"></span></p>
+<p><span style="font-family: Arial;"> 4. Installing and Activating DUO Mobile </span></p>
+<p><span style="font-family: Arial;"> Duo Mobile is an app that runs on your tablet and helps you authenticate quickly and easily. </span></p>
+<ul>
+<li><span style="font-family: Arial;">Search for Duo Mobile in your app store.</span></li>
+<li><span style="font-family: Arial;">Download the app.</span></li>
+<li><span style="font-family: Arial;">Select <strong>"OK"</strong> when asked if Duo Mobile can send push notifications.</span></li>
+<li><span style="font-family: Arial;">Select <strong>Add Account</strong></span></li>
+<li><span style="font-family: Arial;">Once the app is installed, click <strong>I have Duo Mobile installed</strong>.</span></li>
+</ul>
+<p><span style="font-family: Arial;"><img src="/images/group180/shared/IAM/self_enroll_5.jpg" title="Duo Mobile App" alt="Duo Mobile App" class="fr-fic fr-dii" width="499" height="392"><br></span></p>
+<p><span style="font-family: Arial;"> 5. Activate Duo Mobile </span></p>
+<h4 class="panel-head"><span style="font-family: Arial;"> A) &nbsp;Using tablet camera for Activation:</span></h4>
+<div class="panel-content">
+<p><span style="font-family: Arial;"> Activate Duo Mobile by scanning the barcode with the app&rsquo;s built-in barcode scanner using your tablets camera. </span></p>
+<p><span style="font-family: Arial;"><img src="/images/group180/shared/IAM/self_enroll_6a.jpg" title="activate duo mobile" alt="activate duo mobile" class="fr-fic fr-dii" width="499" height="423"><br></span></p>
+<p><span style="font-family: Arial;"> You are now successfully enrolled. &nbsp;If you have more than one device enrolled you will be asked if you would like to make this device your favorite. &nbsp;If it is your favorite it will show first when authenticating. </span></p>
+</div>
+<p></p>
+<h4 class="panel-head"><span style="font-family: Arial;">B) If you opt not to use your tablet camera for Activation</span></h4>
+<div class="panel-content">
+<p><span style="font-family: Arial;"> Select <strong>"Or have an activation link email to you instead"</strong> </span></p>
+<h3><span style="font-family: Arial;"><img src="/images/group180/shared/IAM/activation2.jpg" title="activation email" alt="activation email" class="fr-fic fr-dii" width="308" height="261"><br></span></h3>
+<p><span style="font-family: Arial;"> Enter your email address and select <strong>Send email</strong> </span></p>
+<h1><span style="font-family: Arial;"><img src="/images/group180/shared/IAM/activation3.jpg" title="enter email" alt="enter email" class="fr-fic fr-dii" width="302" height="207"><br></span></h1>
+<p><span style="font-family: Arial;"> Below is an example of the email you will be sent. &nbsp;You should open this email on your tablet by clicking the link or pasting/typing the link in to your tablets broswer URL bar. </span></p>
+<p><span style="font-family: Arial;"><img src="/images/group180/shared/IAM/8Bs_email2_new.jpg" alt="" class="fr-fic fr-dii" role="presentation" width="726" height="117"><br></span></p>
+<p><span style="font-family: Arial;"> Select <strong>Open</strong> </span></p>
+<h3><span style="font-family: Arial;"><img src="/images/group180/shared/IAM/activation4.jpg" title="duo mobile" alt="duo mobile" class="fr-fic fr-dii" width="301" height="312"><br></span></h3>
+<p><span style="font-family: Arial;">Tap Save on the next screen.</span></p>
+<p><span style="font-family: Arial;"> University of Illinois should appear under the Duo Mobile App </span></p>
+<p><span style="font-family: Arial;"><img src="/images/group180/shared/IAM/activation5.jpg" title="activation" alt="activation" class="fr-fic fr-dii" width="298" height="197"><br></span></p>
+<p><span style="font-family: Arial;">You are now successfully enrolled. &nbsp;If you have more than one device enrolled, you will be asked if you would like to make this device your favorite. &nbsp;If it is your favorite, it will show first when authenticating</span><span style="font-family: Arial;">.</span><span style="font-family: Arial;"></span></p>
+</div>
+</div>
+<h2 class="panel-head">Hardware Token</h2>
+<div class="panel-content">
+<p><span style="font-family: Arial;">Type in the serial number of your device which can be found on the back of the hardware token. </span></p>
+<p><span style="font-family: Arial;"> For the Yubikey, you can also find the serial number in your WebStore account (Log into &nbsp;<a href="https://webstore.illinois.edu/shop/" rel="noopener noreferrer" target="_blank">WebStore</a> &nbsp;with your NetID, under Order History select your order number. &nbsp; The serial number will be listed under the Installation Key/Code). </span></p>
+<p><span style="font-family: Arial;"><img src="/images/group180/shared/IAM/addtoken.png" alt="" class="fr-fic fr-dii" role="presentation" width="502" height="360"><br></span></p>
+<p><span style="font-family: Arial;">After you click Continue, you will need to confirm your token.</span></p>
+<h3><span style="font-family: Arial;">For Yubikey:</span></h3>
+<p><span style="font-family: Arial;"> Insert the Yubikey in the USB port of your computer with the gold button facing up. It will take a few seconds to register the first time. &nbsp;Press the gold button on the Yubikey (either on top for USB-A or side for USB-C) and it will generate the passcode and log you in. Make sure CAPS LOCK is off when registering a Yubikey. </span></p>
+</div>
+</div><ol></ol><h2 class="panel-head">Duo Universal Prompt (Urbana, Chicago, and Springfield Applications)</h2><div class="panel-content">
+<ol>
+<li>If you are accessing an application protected by the Duo Universal Prompt, it will walk you through the enrollment process after you authenticate with your username and password:<br><img src="/images/group180/shared/IAM/universal-prompt-enroll-2.PNG" alt="Duo Universal Prompt initial enrollment page" width="371" height="485"></li>
+<li>Next, you will be presented with a list of enrollment options.<br><br>We highly recommend using the Duo Mobile smartphone app, as it offers the best combination of security and convenience:<br><img src="/images/group180/shared/2FA/NoSMS/UniversalPrompt-NoCall-AddDevice.png" alt="Duo Universal Prompt device selection page when enrolling. Options include duo mobile, security key, phone number" width="361" height="424"></li>
+</ol>
+<h2 class="panel-head" id="">Duo Mobile</h2>
+<div class="panel-content">
+<ol>
+<li>If you choose the Duo Mobile option, you will be asked to enter your phone number on the next screen. If you have a tablet you can select that option:<br><img src="/images/group180/shared/IAM/universal-prompt-enroll-6.PNG" alt="Duo universal prompt enrollment - phone number entry" width="368" height="488"></li>
+<li>A text message will be sent to your phone number to verify ownership:<br><img src="/images/group180/shared/IAM/UniversalPrompt-NoCall-AddDevice2.png" alt="Duo Universal Prompt enrollment - phone number entry" width="359" height="448"></li>
+<li>After ownership of the phone is verified, you will be instructed to download the Duo Mobile app, available for iOS and Android:<br><img src="/images/group180/shared/IAM/universal-prompt-enroll-10.png" alt="Duo universal prompt enrollment - download mobile app" width="375" height="464"></li>
+<li>Once Duo Mobile is installed on your phone, open it. Make sure to enable notifications for the app.<br><br>Click on Next in the prompt on your computer, and either scan the QR code provided, or choose to have an activation code emailed to you:<br><img src="/images/group180/shared/2FA/NoSMS/self_enroll_6a.jpg" alt="Duo universal prompt enrollment, scan qr code from app" width="499" height="423"></li>
+<li>Your enrollment is complete! You have the option of adding a backup authentication method. If you choose to skip for now, you can click the "Log in with Duo" button to proceed with the login process:<br><img src="/images/group180/shared/IAM/universal-prompt-enroll-14.PNG" alt="Duo Universal Prompt enrollment complete" width="366" height="453"></li>
+</ol>
+</div>
+<h2 class="panel-head">WebAuthn/FIDO2 Security Key</h2>
+<div class="panel-content">
+<p>The Duo Universal Prompt supports the use of a WebAuthn/FIDO2 Security Key for authentication. Please make sure your security key and browser meet the requirements listed <a href="https://guide.duo.com/universal-prompt#add-security-key" title="Duo Universal Prompt Add Security Key" target="_blank" rel="noopener">here</a>. The dialog boxes you see outside of the Duo Universal Prompt can vary between browsers and operating systems.</p>
+<p><span style="text-decoration: underline;"><strong>NOTE</strong></span>: The NetID Center and AITS Duo Prompts do not support WebAuthn. Because of this, you will want to add another authentication method such as the Duo Mobile app as a backup.</p>
+<ol>
+<li>Once the Security Key option is selected, click Continue. You may see a dialog box from your browser next. If the security key is already recognized by your browser, you can skip to step 2. Otherwise, select the option for 'External security key or built-in sensor':<br><img src="/images/group180/shared/IAM/add-webauthn-key-universal-prompt-3.png" alt="Add webauthn security key browser prompt" width="466" height="731"></li>
+<li>You will then see a dialog box from your operating system. Once you proceed you will be asked to set your security key PIN. If you have not set a PIN yet you can create one.<br><img src="/images/group180/shared/IAM/add-webauthn-key-universal-prompt-4-edited.png" alt="Duo Universal Prompt webauthn" width="499" height="492"></li>
+<li>Once your security key is verified and authorized you will be asked to touch your security key to complete the authentication.<br><img src="/images/group180/shared/IAM/add-webauthn-key-universal-prompt-5.png" alt="Duo Universal Prompt webauthn touch security key" width="522" height="492"></li>
+<li>You're done! As previously mentioned, you will want to have an additional authentication method as a backup in case you encounter an application protected by the AITS Duo Prompt such as Banner or the NetID Center.</li>
+</ol>
+</div>
+<p>You may also enroll using the text method. This is not recommended as using SMS for authentication is not as secure as other methods.</p>
+</div><p></p><div class="kb-class-owner-group-site">
+<p>Internal for future docs:&nbsp;</p>
+<h2 class="panel-head">Microsoft Authenticator</h2>
+<div class="panel-content">
+<ol>
+<li><span style="text-decoration: underline;"><strong>Microsoft Authenticator</strong></span><strong> </strong>-&nbsp;The Microsoft Authenticator app is available on&nbsp;iOS and iPadOS (15.0 or later) as well as Android (8.0 and later). Use the following&nbsp;link to install, make sure to pick your device listed (initially it gives you the iOS, you can select Android if you have an Android device.) <a href="https://go.illinois.edu/MFA_Setup">go.illinois.edu/MFA_Setup</a></li>
+</ol>
+</div>
+</div><div class="panel-content">
+<p><a href="https://go.illinois.edu/MFA_Setup"></a></p>
+</div>
+<div class="kb-page-see-also"><h2>See Also</h2><ul><li><a href="page.php?id=65971">Multi-Factor Authentication (MFA), Introduction</a></li><li><a href="page.php?id=138345">Multi-Factor Authentication (MFA), How to Use</a></li><li><a href="page.php?id=65947">Multi-Factor Authentication (MFA), Enrollment</a></li><li><a href="page.php?id=65948">Multi-Factor Authentication (MFA), Device Management</a></li><li><a href="page.php?id=85687">Multi-Factor Authentication (MFA), Troubleshooting</a></li><li><a href="page.php?id=72159">Multi-Factor Authentication (MFA), Hardware Tokens and Security Keys</a></li></ul></div><script type="text/javascript" src="/images/group41/shared/DownloadableCSSandJSFiles/simple-collapsing-panels.js"></script> 
+<link rel="stylesheet" type="text/css" href="/images/group41/shared/DownloadableCSSandJSFiles/simple-collapsing-panels.css"></div></div></div><br style="clear:both;"><hr class="kbhr1"><div class="doc-info"><div class="doc-attr keywords"><div class="doc-attr-name">Keywords:</div><div class="doc-attr-value"><span id="kb-page-keywords">mfa, 2FA, 2-factor authentication, Two-factor authentication, Duo, Duo Security, Verify, UI Verify, enrollment, multi-factor, multifactor, security, AITS self guide, 2FA setup, activation, code, activate</span>&nbsp; <span id="suggestk-button"><button class="feedback-btn-link" onclick="suggestK(65947,'Multi-Factor+Authentication+%28MFA%29%2C+Enrollment','mfa%2C+2FA%2C+2-factor+authentication%2C+Two-factor+authentication%2C+Duo%2C+Duo+Security%2C+Verify%2C+UI+Verify%2C+enrollment%2C+multi-factor%2C+multifactor%2C+security%2C+AITS+self+guide%2C+2FA+setup%2C+activation%2C+code%2C+activ');">Suggest keywords</button></span><div id="suggestk" aria-expanded="false" style="clear:both; float:left; width:50%;"></div><div id="ks-thank-you" role="status" aria-live="polite" aria-hidden="true" tabindex="-1" style="display:none;">We appreciate your suggestion. Thank you!</div></div></div><div class="doc-attr id"><div class="doc-attr-name">Doc ID:</div><div class="doc-attr-value">65947</div></div><div class="doc-attr owner"><div class="doc-attr-name">Owned&nbsp;by:</div><div class="doc-attr-value"><span class="doc-attr-value-owner-name">Identity and Access Management G. in </span>University of Illinois Technology Services</div></div><div class="doc-attr created"><div class="doc-attr-name">Created:</div><div class="doc-attr-value">2016-08-10</div></div><div class="doc-attr updated"><div class="doc-attr-name">Updated:</div><div class="doc-attr-value">2026-02-09</div></div><div class="doc-attr sites"><div class="doc-attr-name">Sites:</div><div class="doc-attr-value"><a href="https://answers.uillinois.edu/illinois/65947">UniversityofIllinoisTech Serv-external</a>, UniversityofIllinoisTechServ-internal</div></div><div class="doc-attr sites"><div class="doc-attr-name">External link:</div><div class="doc-attr-value"><span id="extLink">https://answers.uillinois.edu/illinois/65947</span> <span class="kbs-copy-icon" onclick="copyElTextToClipboard('extLink')"><img alt="Copy external link" src="/css/svg/copy-14.svg"><span class="kbs-copy-tooltip extLink">Copy</span></span></div></div><div class="doc-attr cleanurl"><div class="doc-attr-name">Clean&nbsp;URL:</div><div class="doc-attr-value"><a href="https://answers.uillinois.edu/illinois/internal/2fa-self-enrollment-guide">https://answers.uillinois.edu/illinois/internal/2fa-self-enrollment-guide</a></div></div><div class="doc-attr feedback"><div class="doc-attr-value"><input type="hidden" id="did" value="65947"><span id="vote-yes"><input type="button" id="helpfulBtn" class="feedback-btn-yes" value="Helpful"></span> <span id="count-yes">25</span> &nbsp; <span id="vote-no"><input type="button" id="unhelpfulBtn" class="feedback-btn-no" value="Unhelpful"></span> <span id="count-no">188</span> &nbsp; <script>if(document.getElementById("helpfulBtn")){document.getElementById("helpfulBtn").addEventListener("click", yesVote);}if(document.getElementById("unhelpfulBtn")){document.getElementById("unhelpfulBtn").addEventListener("click", noVote);}</script> <span class="doc-comment"><a class="feedback-btn-link" href="feedback.php?action=2&amp;help=comment&amp;id=65947">Comment</a></span> <span class="email-to-cust"><a class="feedback-btn-link" href="feedback.php?action=2&amp;help=email&amp;id=65947">Email to customer</a></span> <span class="suggest-doc3"><a class="feedback-btn-link" href="feedback.php?action=2&amp;help=suggest&amp;id=65947">Suggest new doc</a></span> <span class="sub-to-change"><a class="feedback-btn-link" href="feedback.php?action=2&amp;help=subscribe&amp;id=65947">Subscribe to changes</a></span> <span id="fav-doc"><input type="button" class="boxlink" value="Mark as favorite" onclick="markAsFavDoc(65947,13);"></span><span id="feedback-thank-you"></span></div></div></div></main></div><div class="col span_middle3_3_of_3"><aside role="complementary" aria-labelledby="KBhelp"><div class="kbrightlinks"><span id="KBhelp" class="head">KB help</span><ul id="kbrightul0"><li><a href="/kbAdmin/index.php">KB admin tools</a></li><li><a href="/kbGuide/">KB user guide</a></li><li><a href="/kbGuide/page.php?id=5235">How to create a document</a></li><li><a href="/kbGuide/#FAQ">Frequently asked questions</a></li></ul></div></aside></div></div></div><footer><div id="copyright" role="contentinfo">Copyright © 2026 | <a href="78963" target="_blank" title="Privacy Statement">Privacy</a>
+<br><div id="view-toggle"><p>User: ae42@illinois.edu · <a href="search.php?q=showmyfavoritedocs">Favorites</a>  · <a href="/Shibboleth.sso/Logout">Sign out</a><br></p></div></div></footer></div></div><script type="text/javascript">$(function(){
+   
+
+   $(".cloakToggle").click(function(){
+       
+       
+       
+        $elt=$(this).parent().nextAll(".cloak:first");
+        $toggleimg=$(this).children(":first");
+       
+              if($elt.css("display")=="none"){
+                $toggleimg.removeClass("cloakDefaultOpen");
+                $toggleimg.addClass("cloakDefaultClose");
+              $elt.css("display","block");
+              $elt.css("border","double");
+              $elt.css("padding","15px");
+              }else{
+                 $toggleimg.removeClass("cloakDefaultClose");
+                 $toggleimg.addClass("cloakDefaultOpen");
+              $elt.css("display", "none");
+              $elt.css("border", "none")
+              }
+    }).focus(function() {
+    $(this).bind('keydown', 'space', function(e){
+      if(e.which==32){  
+        $(this).trigger('click')
+        e.preventDefault();
+      }
+    });
+
+}).blur(function() {
+    $(this).unbind('keydown');
+
+}).attr("tabIndex",0);
+
+});</script><script type="text/javascript" src="/cssjs/kb-doc-collapsing-panels.js"></script><script>if(document.getElementsByTagName("a")){let els=document.getElementsByTagName("a");for(let i=0;i<els.length;i++){els[i].addEventListener("click", lnks);}}</script></body></html>
