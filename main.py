@@ -37,7 +37,7 @@ MAX_TOKENS = 2048
 TOP_K_ARTICLES = 3
 
 # Number of articles shown in the left search-results panel (independent of TOP_K_ARTICLES).
-DISPLAY_K_ARTICLES = 5
+DISPLAY_K_ARTICLES = 10
 
 KB_BASE_URL = "https://answers.uillinois.edu/illinois/internal"
 
