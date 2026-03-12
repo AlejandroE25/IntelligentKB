@@ -5,16 +5,27 @@ A locally-run web app where a help desk consultant describes a support problem
 in plain English and receives relevant troubleshooting steps drawn from local KB
 articles. TF-IDF pre-filtering is used to select only the most relevant articles
 for each query before sending them to Claude, reducing context size and cost.
+
+Search intelligence upgrades are available via feature flags (see search_enhancement.py):
+  FEATURE_HYBRID_RETRIEVAL      – TF-IDF + semantic (LSA/sentence-transformers) + RRF fusion
+  FEATURE_QUERY_NORMALIZATION   – synonym expansion, optional typo correction
+  FEATURE_ADAPTIVE_TOPK         – score-gap based adaptive top-k for Claude context
+  FEATURE_SEARCH_CACHE          – LRU result cache with TTL
+
+All flags default to False so the current behaviour is preserved unless opted in.
 """
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 import re
 import secrets
 import sys
 from datetime import date
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 from bs4 import BeautifulSoup
@@ -23,6 +34,21 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import anthropic
 from flask import Flask, jsonify, render_template_string, request
+
+# Optional search-enhancement module – imported at module level so tests can
+# monkeypatch its FeatureFlags.  Falls back gracefully if the file is missing.
+try:
+    from search_enhancement import (
+        FeatureFlags,
+        HybridRetriever,
+        SearchTimings,
+        adaptive_top_k,
+    )
+    _SEARCH_ENHANCEMENT_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    _SEARCH_ENHANCEMENT_AVAILABLE = False
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -1120,6 +1146,7 @@ def create_app(
     vectorizer: TfidfVectorizer,
     doc_matrix: np.ndarray,
     contacts_text: str = "",
+    retriever: Optional["HybridRetriever"] = None,  # type: ignore[name-defined]
 ) -> Flask:
     """Create and configure the Flask application.
 
@@ -1127,11 +1154,17 @@ def create_app(
     - DISPLAY_K_ARTICLES articles for the left panel (with scores for relevancy labels)
     - TOP_K_ARTICLES articles to pass to Claude for the right panel
 
+    When *retriever* is provided (and its feature flags are enabled) the
+    hybrid retrieval path is used instead of direct TF-IDF cosine similarity.
+
     Claude may fetch additional articles mid-response via tool calls handled
     by the agentic loop.
     """
     app = Flask(__name__)
     app.secret_key = secrets.token_hex(32)
+
+    # Build article lookup map once for O(1) access in route helpers
+    _id_to_article: dict[str, dict] = {a["article_id"]: a for a in articles}
 
     def _is_stale_filter(updated: str) -> bool:
         return _is_stale(updated)
@@ -1157,6 +1190,53 @@ def create_app(
             relevance_medium=RELEVANCE_MEDIUM,
             kb_base_url=KB_BASE_URL,
         )
+
+    # ------------------------------------------------------------------
+    # Retrieval helpers (enhanced path when retriever is provided)
+    # ------------------------------------------------------------------
+
+    def _get_display_articles(
+        query: str,
+    ) -> list[tuple[dict[str, str], float]]:
+        """Return display articles as (article, score) pairs.
+
+        Uses the hybrid retriever when available; otherwise falls back to the
+        original TF-IDF cosine similarity implementation.
+        """
+        if retriever is not None:
+            id_score_pairs, _ = retriever.retrieve(
+                query, articles, vectorizer, doc_matrix, top_k=DISPLAY_K_ARTICLES
+            )
+            return [
+                (_id_to_article[aid], score)
+                for aid, score in id_score_pairs
+                if aid in _id_to_article
+            ]
+        return select_display_articles(query, articles, vectorizer, doc_matrix)
+
+    def _get_top_articles_for_claude(
+        display: list[tuple[dict[str, str], float]],
+    ) -> list[dict[str, str]]:
+        """Select the articles to pass to Claude.
+
+        With FEATURE_ADAPTIVE_TOPK enabled the selection boundary is determined
+        by score gaps rather than the fixed TOP_K_ARTICLES constant.
+        """
+        if (
+            _SEARCH_ENHANCEMENT_AVAILABLE
+            and retriever is not None
+            and retriever.flags.adaptive_topk
+        ):
+            scores = [s for _, s in display]
+            k = adaptive_top_k(
+                scores,
+                min_k=TOP_K_ARTICLES,
+                max_k=min(DISPLAY_K_ARTICLES, len(display)),
+            )
+            return [a for a, _ in display[:k]]
+        return [a for a, _ in display[:TOP_K_ARTICLES]]
+
+    # ------------------------------------------------------------------
 
     def _run_claude(query: str, top_articles: list[dict[str, str]]) -> tuple[str | None, str, str]:
         """Run Claude for the given query and top articles.
@@ -1199,8 +1279,8 @@ def create_app(
             return _render()
 
         # Select articles for both panels in one pass
-        display = select_display_articles(query, articles, vectorizer, doc_matrix)
-        top_articles = [a for a, _ in display[:TOP_K_ARTICLES]]
+        display = _get_display_articles(query)
+        top_articles = _get_top_articles_for_claude(display)
 
         ai_response, ai_footer, ai_error = _run_claude(query, top_articles)
         return _render(
@@ -1220,8 +1300,8 @@ def create_app(
             return _render()
 
         # Re-compute display articles from the original query (left panel unchanged)
-        display = select_display_articles(original_query, articles, vectorizer, doc_matrix)
-        top_articles = [a for a, _ in display[:TOP_K_ARTICLES]]
+        display = _get_display_articles(original_query)
+        top_articles = _get_top_articles_for_claude(display)
 
         # Build combined prompt for Claude
         if refinement:
@@ -1245,7 +1325,7 @@ def create_app(
         if not q:
             return jsonify({"articles": [], "count": 0})
 
-        display = select_display_articles(q, articles, vectorizer, doc_matrix)
+        display = _get_display_articles(q)
         result = []
         for i, (article, score) in enumerate(display):
             if score >= RELEVANCE_HIGH:
@@ -1268,7 +1348,9 @@ def create_app(
                 "in_ai": i < TOP_K_ARTICLES,
                 "url": f"{KB_BASE_URL}/{article['article_id']}" if article["article_id"] else "",
             })
-        return jsonify({"articles": result, "count": len(result)})
+
+        resp = jsonify({"articles": result, "count": len(result)})
+        return resp
 
     @app.route("/ai", methods=["POST"])
     def ai():
@@ -1284,8 +1366,8 @@ def create_app(
             else query
         )
         # Derive top articles from the original (un-refined) query
-        display = select_display_articles(query, articles, vectorizer, doc_matrix)
-        top_articles = [a for a, _ in display[:TOP_K_ARTICLES]]
+        display = _get_display_articles(query)
+        top_articles = _get_top_articles_for_claude(display)
         ai_response, ai_footer, ai_error = _run_claude(combined, top_articles)
         return jsonify({"response": ai_response, "footer": ai_footer, "error": ai_error})
 
@@ -1342,8 +1424,19 @@ def main() -> None:
         print(f"    {a['filename']}")
 
     vectorizer, doc_matrix = build_article_index(articles)
+
+    # Optionally initialise the hybrid retriever (no-op if all flags are False)
+    retriever = None
+    if _SEARCH_ENHANCEMENT_AVAILABLE:
+        from search_enhancement import FeatureFlags, HybridRetriever
+        flags = FeatureFlags()
+        if flags.any_enabled():
+            retriever = HybridRetriever(flags)
+            retriever.build(articles, vectorizer, doc_matrix)
+            print(f"Search enhancements active: {flags}")
+
     client = anthropic.Anthropic(api_key=api_key)
-    app = create_app(client, articles, vectorizer, doc_matrix, contacts_text)
+    app = create_app(client, articles, vectorizer, doc_matrix, contacts_text, retriever)
 
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "5000"))
