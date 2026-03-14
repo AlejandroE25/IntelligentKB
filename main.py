@@ -732,51 +732,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     }
     .btn-refine:hover { background: #484848; }
     .btn-refine:active { border-style: inset; }
-
-    /* ── ARTICLE FRAME ── */
-    #article-frame-wrapper {
-      display: none;
-      flex: 1;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    #article-frame {
-      flex: 1;
-      border: none;
-      width: 100%;
-    }
-    #article-frame-bar {
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      padding: 4px 8px;
-      background: #2e2e2e;
-      border-top: 1px solid #444;
-    }
-    #article-frame-title {
-      color: #aaa;
-      font-size: 11px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      flex: 1;
-    }
-    .btn-close-frame {
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 12px;
-      background: #3a3a3a;
-      color: #cccccc;
-      border: 2px outset #666;
-      padding: 2px 10px;
-      height: 26px;
-      cursor: pointer;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-    .btn-close-frame:hover { background: #484848; }
-    .btn-close-frame:active { border-style: inset; }
   </style>
 </head>
 <body>
@@ -811,9 +766,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <div class="result-card{% if not in_ai %} not-in-ai{% endif %}">
               <div class="card-title-row">
                 {% if article.article_id %}
-                  <a class="card-title article-link" href="{{ kb_base_url }}/{{ article.article_id }}"
-                     data-article-url="{{ kb_base_url }}/{{ article.article_id }}"
-                     data-article-title="{{ article.title | e }}"
+                  <a class="card-title" href="{{ kb_base_url }}/{{ article.article_id }}"
                      title="{{ article.title }}">{{ article.title }}</a>
                 {% else %}
                   <span class="card-title" title="{{ article.title }}">{{ article.title }}</span>
@@ -842,9 +795,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       </div>
     </div>
 
-    <!-- RIGHT: AI Troubleshooting / Article Viewer -->
+    <!-- RIGHT: AI Troubleshooting -->
     <div id="right-panel">
-      <div class="panel-header" id="right-panel-header">AI TROUBLESHOOTING</div>
+      <div class="panel-header">AI TROUBLESHOOTING</div>
       <div id="ai-content">
         {% if ai_response is none and display_articles is none %}
           <p class="empty-state">AI troubleshooting steps will appear here after a search.</p>
@@ -873,15 +826,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           </form>
         </div>
 
-      <!-- Article iframe (shown when an article link is clicked) -->
-      <div id="article-frame-wrapper">
-        <iframe id="article-frame" title="Article viewer"></iframe>
-        <div id="article-frame-bar">
-          <span id="article-frame-title"></span>
-          <button class="btn-close-frame" id="btn-close-frame">&#8592; Back to AI Steps</button>
-        </div>
-      </div>
-
     </div>
 
   </div>
@@ -897,7 +841,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     function buildCard(a) {
       const notInAiClass = a.in_ai ? '' : ' not-in-ai';
       const titleHtml = a.url
-        ? `<a class="card-title article-link" href="${esc(a.url)}" data-article-url="${esc(a.url)}" data-article-title="${esc(a.title)}" title="${esc(a.title)}">${esc(a.title)}</a>`
+        ? `<a class="card-title" href="${esc(a.url)}" title="${esc(a.title)}">${esc(a.title)}</a>`
         : `<span class="card-title" title="${esc(a.title)}">${esc(a.title)}</span>`;
       const staleHtml = a.is_stale
         ? ` <span class="stale-badge">⚠ Last updated ${esc(String(a.updated).slice(0, 4))}</span>`
@@ -918,53 +862,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     }
 
     // ── DOM refs ─────────────────────────────────────────────────────────────
-    const searchInput        = document.getElementById('search-input');
-    const searchForm         = document.getElementById('search-form');
-    const resultsHeader      = document.getElementById('results-header');
-    const resultsList        = document.getElementById('results-list');
-    const aiContent          = document.getElementById('ai-content');
-    const refineArea         = document.getElementById('refine-area');
-    const refineForm         = document.getElementById('refine-form');
-    const refineInput        = document.getElementById('refine-input');
-    const refineQueryIn      = refineForm ? refineForm.querySelector('[name="original_query"]') : null;
-    const rightPanelHeader   = document.getElementById('right-panel-header');
-    const articleFrameWrapper = document.getElementById('article-frame-wrapper');
-    const articleFrame       = document.getElementById('article-frame');
-    const articleFrameTitle  = document.getElementById('article-frame-title');
-    const btnCloseFrame      = document.getElementById('btn-close-frame');
+    const searchInput   = document.getElementById('search-input');
+    const searchForm    = document.getElementById('search-form');
+    const resultsHeader = document.getElementById('results-header');
+    const resultsList   = document.getElementById('results-list');
+    const aiContent     = document.getElementById('ai-content');
+    const refineArea    = document.getElementById('refine-area');
+    const refineForm    = document.getElementById('refine-form');
+    const refineInput   = document.getElementById('refine-input');
+    const refineQueryIn = refineForm ? refineForm.querySelector('[name="original_query"]') : null;
 
     // ── State ─────────────────────────────────────────────────────────────────
     let searchTimer = null;
     let lastSearchQuery = '';
-
-    // ── Article frame ─────────────────────────────────────────────────────────
-    function showArticleFrame(url, title) {
-      aiContent.style.display = 'none';
-      if (refineArea) refineArea.style.display = 'none';
-      articleFrameWrapper.style.display = 'flex';
-      articleFrame.src = url;
-      if (articleFrameTitle) articleFrameTitle.textContent = title || url;
-      if (rightPanelHeader) rightPanelHeader.textContent = 'ARTICLE VIEWER';
-    }
-
-    function closeArticleFrame() {
-      articleFrameWrapper.style.display = 'none';
-      articleFrame.src = 'about:blank';
-      aiContent.style.display = '';
-      const hasResponse = !!aiContent.querySelector('#ai-body:not(.ai-error)');
-      if (refineArea) refineArea.style.display = hasResponse ? '' : 'none';
-      if (rightPanelHeader) rightPanelHeader.textContent = 'AI TROUBLESHOOTING';
-    }
-
-    // ── Article link click (delegated) ────────────────────────────────────────
-    resultsList.addEventListener('click', function (e) {
-      const link = e.target.closest('.article-link');
-      if (!link) return;
-      e.preventDefault();
-      showArticleFrame(link.dataset.articleUrl, link.dataset.articleTitle);
-    });
-
-    if (btnCloseFrame) btnCloseFrame.addEventListener('click', closeArticleFrame);
 
     // ── Live search (debounced 300 ms) ────────────────────────────────────────
     async function doSearch(q) {
