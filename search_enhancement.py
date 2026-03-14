@@ -229,19 +229,12 @@ class SearchTimings:
         }
 
     def confidence(self, results: List[Tuple[str, float]]) -> str:
-        """Return confidence based on top score and separation from runner-up."""
+        """Return a simple confidence indicator based on top score."""
         if not results:
             return "none"
         top_score = results[0][1]
         if top_score >= 0.20:
             return "high"
-
-        # Promote near-threshold top hits when they are clearly separated.
-        if len(results) > 1:
-            second_score = results[1][1]
-            if top_score >= 0.16 and (top_score - second_score) >= 0.03:
-                return "high"
-
         if top_score >= 0.08:
             return "medium"
         return "low"
@@ -669,6 +662,70 @@ class HybridRetriever:
         sem = max(semantic_scores.get(article_id, 0.0), 0.0)
         return float(min(0.25, sem * 0.25))
 
+    @staticmethod
+    def _token_root(token: str) -> str:
+        """Apply light stemming for overlap checks (e.g., enroll/enrollment)."""
+        for suffix in ("ments", "ment", "ingly", "edly", "ing", "ed", "es", "s"):
+            if token.endswith(suffix) and (len(token) - len(suffix)) >= 4:
+                return token[: -len(suffix)]
+        return token
+
+    def _keyword_roots(self, text: str) -> set[str]:
+        stop = {
+            "how", "do", "i", "in", "to", "the", "a", "an", "for", "and",
+            "or", "of", "on", "with", "my", "is", "are", "can", "you", "me",
+            "help", "please", "issue", "problem", "not", "from", "at", "it",
+        }
+        tokens = re.findall(r"[a-z0-9]+", text.lower())
+        roots: set[str] = set()
+        for token in tokens:
+            if len(token) < 3 or token in stop:
+                continue
+            roots.add(self._token_root(token))
+        return roots
+
+    def _has_keyword_overlap(self, query: str, article: Dict[str, Any]) -> bool:
+        """Return True when query terms significantly overlap article metadata."""
+        query_roots = self._keyword_roots(query)
+        if not query_roots:
+            return False
+
+        article_text = (
+            f"{article.get('title', '')} "
+            f"{article.get('keywords', '')} "
+            f"{article.get('content', '')[:1200]}"
+        )
+        article_roots = self._keyword_roots(article_text)
+        overlap = query_roots & article_roots
+
+        if len(overlap) >= 2:
+            return True
+        if len(overlap) == 1 and len(query_roots) <= 2:
+            return True
+        return False
+
+    def _confidence_with_overlap(
+        self,
+        query: str,
+        results: List[Tuple[str, float]],
+        articles_by_id: Dict[str, Dict[str, Any]],
+    ) -> str:
+        """Promote near-exact top hits to high confidence only with term overlap."""
+        base_confidence = SearchTimings().confidence(results)
+        if base_confidence != "medium" or len(results) < 2:
+            return base_confidence
+
+        top_score = results[0][1]
+        second_score = results[1][1]
+        if top_score < 0.16 or (top_score - second_score) < 0.03:
+            return base_confidence
+
+        top_article = articles_by_id.get(results[0][0])
+        if top_article and self._has_keyword_overlap(query, top_article):
+            return "high"
+
+        return base_confidence
+
     # ------------------------------------------------------------------
     # Retrieve
     # ------------------------------------------------------------------
@@ -690,6 +747,7 @@ class HybridRetriever:
         """
         timings = SearchTimings()
         t_total_start = time.perf_counter()
+        articles_by_id = {a.get("article_id", ""): a for a in articles if a.get("article_id")}
 
         # ── 1. Query normalisation ─────────────────────────────────────
         elapsed: list = [0.0]
@@ -766,7 +824,7 @@ class HybridRetriever:
             self._cache.set(norm_query, fused, self.CONFIG_VERSION)
 
         timings.total_ms = (time.perf_counter() - t_total_start) * 1_000.0
-        confidence = timings.confidence(fused)
+        confidence = self._confidence_with_overlap(query, fused, articles_by_id)
         log_retrieval(query, norm_query, timings, len(fused), confidence)
 
         # ── 8. Typo-corrected retry when lexical confidence is low ─────
@@ -795,7 +853,11 @@ class HybridRetriever:
                     fused = lexical_retry[:top_k]
                     timings.total_ms = (time.perf_counter() - t_total_start) * 1_000.0
                     log_retrieval(
-                        query, typo_query, timings, len(fused), timings.confidence(fused)
+                        query,
+                        typo_query,
+                        timings,
+                        len(fused),
+                        self._confidence_with_overlap(query, fused, articles_by_id),
                     )
 
         return fused, timings

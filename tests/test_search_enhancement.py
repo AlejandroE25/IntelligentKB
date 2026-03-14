@@ -246,7 +246,7 @@ class TestSearchTimings:
     def test_confidence_high_when_top_has_clear_gap(self):
         t = SearchTimings()
         results = [("1001", 0.18), ("1002", 0.14), ("1003", 0.10)]
-        assert t.confidence(results) == "high"
+        assert t.confidence(results) == "medium"
 
     def test_confidence_low(self):
         t = SearchTimings()
@@ -656,6 +656,28 @@ class TestHybridRetriever:
         assert results
         # Calibrated hybrid scores should stay in a readable TF-IDF-like range.
         assert results[0][1] >= 0.08
+
+    def test_overlap_promotes_near_exact_medium_to_high(self):
+        flags = self._make_flags()
+        retriever = HybridRetriever(flags)
+        results = [("1001", 0.18), ("1002", 0.14)]
+        articles_by_id = {a["article_id"]: a for a in SAMPLE_ARTICLES}
+
+        confidence = retriever._confidence_with_overlap(
+            "duo authentication setup", results, articles_by_id
+        )
+        assert confidence == "high"
+
+    def test_no_overlap_keeps_near_exact_as_medium(self):
+        flags = self._make_flags()
+        retriever = HybridRetriever(flags)
+        results = [("1002", 0.18), ("1001", 0.14)]
+        articles_by_id = {a["article_id"]: a for a in SAMPLE_ARTICLES}
+
+        confidence = retriever._confidence_with_overlap(
+            "duo enrollment mobile", results, articles_by_id
+        )
+        assert confidence == "medium"
 
 
 # ---------------------------------------------------------------------------
