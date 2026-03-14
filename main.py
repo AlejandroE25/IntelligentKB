@@ -35,6 +35,15 @@ from sklearn.metrics.pairwise import cosine_similarity
 import anthropic
 from flask import Flask, jsonify, render_template_string, request
 
+try:
+  from azure.identity import DefaultAzureCredential
+  from azure.storage.blob import BlobServiceClient
+  _AZURE_BLOB_AVAILABLE = True
+except ImportError:  # pragma: no cover
+  DefaultAzureCredential = None  # type: ignore[assignment]
+  BlobServiceClient = None  # type: ignore[assignment]
+  _AZURE_BLOB_AVAILABLE = False
+
 # Optional search-enhancement module – imported at module level so tests can
 # monkeypatch its FeatureFlags.  Falls back gracefully if the file is missing.
 try:
@@ -66,6 +75,10 @@ TOP_K_ARTICLES = 3
 DISPLAY_K_ARTICLES = 10
 
 KB_BASE_URL = "https://answers.uillinois.edu/illinois/internal"
+
+# ``ARTICLE_SOURCE`` options.
+ARTICLE_SOURCE_LOCAL = "local"
+ARTICLE_SOURCE_BLOB = "blob"
 
 # Articles last updated more than this many years ago are flagged as potentially stale.
 STALE_ARTICLE_YEARS = 2
@@ -173,6 +186,12 @@ def _is_stale(updated: str) -> bool:
 
 
 def parse_article(path: Path) -> dict[str, str]:
+    """Parse a local UW-Madison-style KB HTML article file."""
+    html = path.read_text(encoding="utf-8", errors="replace")
+    return parse_article_html(path.name, html)
+
+
+def parse_article_html(filename: str, html: str) -> dict[str, str]:
     """Parse a UW-Madison-style KB HTML article and return a dict with:
        - filename:   base name of the file
        - article_id: numeric KB article ID
@@ -183,7 +202,6 @@ def parse_article(path: Path) -> dict[str, str]:
        - updated:    last-updated date string (e.g. '2025-02-04'), may be empty
        - owner:      owning team/group string, may be empty
     """
-    html = path.read_text(encoding="utf-8", errors="replace")
     soup = BeautifulSoup(html, "html.parser")
 
     # 1. Extract metadata from doc-attr BEFORE stripping it
@@ -214,7 +232,7 @@ def parse_article(path: Path) -> dict[str, str]:
 
     # 4. Extract title
     title_tag = soup.find("title")
-    title = title_tag.text.strip() if title_tag else path.stem
+    title = title_tag.text.strip() if title_tag else Path(filename).stem
 
     # 4. Extract keywords
     keywords_span = soup.find("span", id="kb-page-keywords")
@@ -230,7 +248,7 @@ def parse_article(path: Path) -> dict[str, str]:
         content = body.get_text(separator="\n", strip=True) if body else soup.get_text(separator="\n", strip=True)
 
     return {
-        "filename": path.name,
+        "filename": filename,
         "article_id": article_id,
         "title": title,
         "keywords": keywords,
@@ -257,6 +275,101 @@ def load_articles(articles_dir: Path) -> tuple[list[dict[str, str]], str]:
             else:
                 articles.append(parse_article(filepath))
     return articles, contacts_text
+
+
+def _build_blob_service_client_from_env() -> "BlobServiceClient":
+    """Build a BlobServiceClient using connection string or managed identity."""
+    if not _AZURE_BLOB_AVAILABLE:
+        raise RuntimeError(
+            "Azure Blob dependencies are not installed. "
+            "Install 'azure-storage-blob' and 'azure-identity'."
+        )
+
+    connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING", "").strip()
+    if connection_string:
+        return BlobServiceClient.from_connection_string(connection_string)
+
+    account_url = os.environ.get("AZURE_STORAGE_ACCOUNT_URL", "").strip()
+    if account_url:
+        return BlobServiceClient(
+            account_url=account_url,
+            credential=DefaultAzureCredential(),
+        )
+
+    raise RuntimeError(
+        "Set AZURE_STORAGE_CONNECTION_STRING or AZURE_STORAGE_ACCOUNT_URL when ARTICLE_SOURCE=blob."
+    )
+
+
+def load_articles_from_blob(container_name: str, prefix: str = "") -> tuple[list[dict[str, str]], str]:
+    """Load articles from an Azure Blob container.
+
+    Only ``.htm`` and ``.html`` blobs are parsed. ``contacts.html`` (case-insensitive
+    basename) is treated as escalation contacts and excluded from the article list.
+    """
+    service_client = _build_blob_service_client_from_env()
+    container_client = service_client.get_container_client(container_name)
+
+    start_with = prefix or None
+    blob_names = sorted(
+        b.name
+        for b in container_client.list_blobs(name_starts_with=start_with)
+        if Path(b.name).suffix.lower() in (".htm", ".html")
+    )
+
+    articles: list[dict[str, str]] = []
+    contacts_text = ""
+    for blob_name in blob_names:
+        raw = container_client.download_blob(blob_name).readall()
+        parsed = parse_article_html(Path(blob_name).name, raw.decode("utf-8", errors="replace"))
+        parsed["filename"] = blob_name
+
+        if Path(blob_name).name.lower() == CONTACTS_FILENAME:
+            contacts_text = parsed["content"]
+        else:
+            articles.append(parsed)
+
+    return articles, contacts_text
+
+
+def load_articles_from_source() -> tuple[list[dict[str, str]], str, str]:
+    """Load KB content from the configured source.
+
+    Environment variables:
+      - ARTICLE_SOURCE=local|blob (default: local)
+      - For local: no additional vars (reads from ARTICLES_DIR)
+      - For blob:  AZURE_STORAGE_CONTAINER (required)
+                   AZURE_STORAGE_PREFIX (optional)
+                   AZURE_STORAGE_CONNECTION_STRING or AZURE_STORAGE_ACCOUNT_URL
+    """
+    source = os.environ.get("ARTICLE_SOURCE", ARTICLE_SOURCE_LOCAL).strip().lower()
+    if source in ("", ARTICLE_SOURCE_LOCAL):
+        if not ARTICLES_DIR.is_dir():
+            raise RuntimeError(
+                f"Articles directory not found at '{ARTICLES_DIR}'. "
+                "Create an 'articles/' directory or switch to ARTICLE_SOURCE=blob."
+            )
+        articles, contacts_text = load_articles(ARTICLES_DIR)
+        return articles, contacts_text, f"local directory '{ARTICLES_DIR}'"
+
+    if source == ARTICLE_SOURCE_BLOB:
+        container = os.environ.get("AZURE_STORAGE_CONTAINER", "").strip()
+        if not container:
+            raise RuntimeError("AZURE_STORAGE_CONTAINER is required when ARTICLE_SOURCE=blob.")
+
+        prefix = os.environ.get("AZURE_STORAGE_PREFIX", "").strip().strip("/")
+        if prefix:
+            prefix = prefix + "/"
+
+        articles, contacts_text = load_articles_from_blob(container, prefix=prefix)
+        source_label = f"Azure Blob container '{container}'"
+        if prefix:
+            source_label += f" (prefix '{prefix}')"
+        return articles, contacts_text, source_label
+
+    raise RuntimeError(
+        "Invalid ARTICLE_SOURCE value. Supported values are 'local' and 'blob'."
+    )
 
 # ---------------------------------------------------------------------------
 # TF-IDF Article Index
@@ -1402,24 +1515,21 @@ def main() -> None:
         )
         sys.exit(1)
 
-    if not ARTICLES_DIR.is_dir():
-        print(
-            f"Error: Articles directory not found at '{ARTICLES_DIR}'.\n"
-            "Create an 'articles/' directory containing .htm or .html KB article files.",
-            file=sys.stderr,
-        )
+    try:
+        articles, contacts_text, source_label = load_articles_from_source()
+    except Exception as exc:
+        print(f"Error loading articles: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    articles, contacts_text = load_articles(ARTICLES_DIR)
     if not articles:
         print(
-            f"Warning: No .htm or .html files found in '{ARTICLES_DIR}'.\n"
-            "Add KB articles to the articles/ directory and try again.",
+            f"Warning: No .htm or .html files found in {source_label}.\n"
+            "Add KB articles and try again.",
             file=sys.stderr,
         )
         sys.exit(1)
 
-    print(f"Loaded {len(articles)} KB article(s):")
+    print(f"Loaded {len(articles)} KB article(s) from {source_label}:")
     for a in articles:
         print(f"    {a['filename']}")
 

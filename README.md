@@ -2,11 +2,10 @@
 
 A locally-run Python web app where a help desk consultant describes a support
 problem in plain English and receives relevant troubleshooting steps drawn from
-a small set of local KB articles.
+a KB article corpus stored either locally or in Azure Blob Storage.
 
-Because the total article content is under 30,000 characters, all articles are
-loaded directly into Claude's context window — no vector database or embeddings
-needed.
+Because the current article content is modest, selected articles are loaded
+directly into Claude's context window — no vector database required.
 
 ## Tech Stack
 
@@ -21,7 +20,7 @@ needed.
 
 ```
 IntelligentKB/
-├── articles/                   # KB articles as .htm or .html files
+├── articles/                   # Local KB articles (.htm/.html) when ARTICLE_SOURCE=local
 │   ├── Campus Wi-Fi, Getting Connected (Start Here).html
 │   ├── Email, How to set up email forwarding.html
 │   └── ...
@@ -47,14 +46,79 @@ cp .env.example .env
 # Edit .env and replace the placeholder with your actual Anthropic API key
 ```
 
-### 3. (Optional) Add or customise KB articles
+### 3. Configure article source
+
+By default, the app reads local files from `articles/`.
+
+#### Option A: Local files (default)
+
+```bash
+ARTICLE_SOURCE=local
+```
 
 Drop any additional `.htm` or `.html` files that follow the UW-Madison
 KnowledgeBase HTML structure into the `articles/` directory.
 
+#### Option B: Azure Blob Storage
+
+Set:
+
+```bash
+ARTICLE_SOURCE=blob
+AZURE_STORAGE_CONTAINER=<container-name>
+AZURE_STORAGE_PREFIX=<optional/path/prefix>
+```
+
+Then choose one authentication method:
+
+```bash
+# Method 1: connection string
+AZURE_STORAGE_CONNECTION_STRING="DefaultEndpointsProtocol=..."
+
+# Method 2: managed identity / Entra ID token
+AZURE_STORAGE_ACCOUNT_URL="https://<storage-account>.blob.core.windows.net"
+```
+
+Notes:
+- `AZURE_STORAGE_PREFIX` is optional. If set, only blobs under that prefix are read.
+- Only `.htm` / `.html` blobs are indexed.
+- A blob named `contacts.html` (case-insensitive basename) is treated as escalation contacts and excluded from retrieval.
+
+### 4. Upload articles to Blob (one-time / ongoing)
+
+Create storage resources and upload with Azure CLI:
+
+```bash
+az login
+az group create -n <rg> -l <region>
+az storage account create -g <rg> -n <storage-account> -l <region> --sku Standard_LRS
+az storage container create --account-name <storage-account> -n kb-articles --auth-mode login
+
+# Upload your local folder to an optional prefix, e.g. "uwkb/"
+az storage blob upload-batch \
+  --account-name <storage-account> \
+  --auth-mode login \
+  --destination kb-articles \
+  --destination-path uwkb \
+  --source articles
+```
+
+If using managed identity in Azure App Service / Container Apps, grant the app
+`Storage Blob Data Reader` on the storage account or container scope.
+
 ## Running the Tool
 
 ```bash
+python main.py
+```
+
+Blob-backed example:
+
+```bash
+ARTICLE_SOURCE=blob \
+AZURE_STORAGE_CONTAINER=kb-articles \
+AZURE_STORAGE_PREFIX=uwkb \
+AZURE_STORAGE_ACCOUNT_URL=https://<storage-account>.blob.core.windows.net \
 python main.py
 ```
 
@@ -75,9 +139,10 @@ Click **New Conversation** in the header to clear the chat history.
 
 ## How It Works
 
-1. **Startup** — `main.py` reads every `.htm`/`.html` file in `articles/`,
-   parses each one with BeautifulSoup, and builds a system prompt containing
-   all cleaned article content with clear separators.
+1. **Startup** — `main.py` loads articles from the configured source
+  (`ARTICLE_SOURCE=local` or `ARTICLE_SOURCE=blob`), parses each one with
+  BeautifulSoup, and builds a system prompt containing all cleaned article
+  content with clear separators.
 2. **Query** — The user types a problem description in the web UI.
 3. **Generation** — The query is sent to Claude along with the full article
    content in the system prompt. Claude identifies relevant articles and

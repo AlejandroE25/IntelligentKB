@@ -243,6 +243,15 @@ class TestParseArticle:
         assert "Fallback body text" in result["content"]
 
 
+class TestParseArticleHtml:
+    def test_title_falls_back_to_filename_stem(self):
+        from main import parse_article_html
+        html = "<html><body><div id='kbcontent'>Hello world</div></body></html>"
+        result = parse_article_html("sample_name.html", html)
+        assert result["title"] == "sample_name"
+        assert "Hello world" in result["content"]
+
+
 # ---------------------------------------------------------------------------
 # load_articles
 # ---------------------------------------------------------------------------
@@ -283,6 +292,36 @@ class TestLoadArticles:
         articles, contacts = load_articles(tmp_path)
         assert articles == []
         assert contacts == ""
+
+
+class TestLoadArticlesFromSource:
+    def test_local_source_reads_from_articles_dir(self, tmp_path, monkeypatch):
+        import main
+
+        _write_html(tmp_path, "article1.html", SAMPLE_HTML)
+        monkeypatch.setenv("ARTICLE_SOURCE", "local")
+        monkeypatch.setattr(main, "ARTICLES_DIR", tmp_path)
+
+        articles, contacts, source_label = main.load_articles_from_source()
+        assert len(articles) == 1
+        assert contacts == ""
+        assert "local directory" in source_label
+
+    def test_blob_source_requires_container_env(self, monkeypatch):
+        from main import load_articles_from_source
+
+        monkeypatch.setenv("ARTICLE_SOURCE", "blob")
+        monkeypatch.delenv("AZURE_STORAGE_CONTAINER", raising=False)
+
+        with pytest.raises(RuntimeError, match="AZURE_STORAGE_CONTAINER"):
+            load_articles_from_source()
+
+    def test_invalid_source_raises(self, monkeypatch):
+        from main import load_articles_from_source
+
+        monkeypatch.setenv("ARTICLE_SOURCE", "not-valid")
+        with pytest.raises(RuntimeError, match="Invalid ARTICLE_SOURCE"):
+            load_articles_from_source()
 
 
 # ---------------------------------------------------------------------------
