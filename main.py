@@ -248,14 +248,29 @@ def load_articles(articles_dir: Path) -> tuple[list[dict[str, str]], str]:
     content of ``contacts.html`` (if present) and ``articles`` contains everything
     else.  The contacts file is excluded from the TF-IDF index.
     """
-    articles = []
+    articles_by_key: dict[str, dict[str, str]] = {}
     contacts_text = ""
     for ext in ("*.htm", "*.html"):
         for filepath in sorted(articles_dir.glob(ext)):
             if filepath.name.lower() == CONTACTS_FILENAME:
                 contacts_text = parse_article(filepath)["content"]
             else:
-                articles.append(parse_article(filepath))
+                parsed = parse_article(filepath)
+                article_id = parsed.get("article_id", "").strip()
+                dedupe_key = article_id if article_id else parsed["filename"].lower()
+
+                existing = articles_by_key.get(dedupe_key)
+                if existing is None:
+                    articles_by_key[dedupe_key] = parsed
+                    continue
+
+                # Prefer .html over .htm when both represent the same article.
+                existing_is_htm = existing["filename"].lower().endswith(".htm")
+                parsed_is_html = parsed["filename"].lower().endswith(".html")
+                if existing_is_htm and parsed_is_html:
+                    articles_by_key[dedupe_key] = parsed
+
+    articles = list(articles_by_key.values())
     return articles, contacts_text
 
 # ---------------------------------------------------------------------------

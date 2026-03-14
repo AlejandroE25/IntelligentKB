@@ -251,7 +251,12 @@ class TestLoadArticles:
     def test_loads_html_files(self, tmp_path):
         from main import load_articles
         _write_html(tmp_path, "article1.html", SAMPLE_HTML)
-        _write_html(tmp_path, "article2.html", FRESH_HTML)
+        second = (
+            FRESH_HTML
+            .replace("resultc.php?action=7&amp;id=99999", "resultc.php?action=7&amp;id=99998")
+            .replace("<div class=\"doc-attr-value\">99999</div>", "<div class=\"doc-attr-value\">99998</div>")
+        )
+        _write_html(tmp_path, "article2.html", second)
         articles, contacts = load_articles(tmp_path)
         assert len(articles) == 2
         assert contacts == ""
@@ -283,6 +288,19 @@ class TestLoadArticles:
         articles, contacts = load_articles(tmp_path)
         assert articles == []
         assert contacts == ""
+
+    def test_deduplicates_same_article_id_across_htm_and_html(self, tmp_path):
+        from main import load_articles
+
+        html_htm = SAMPLE_HTML.replace("Test Article Title", "Test Article HTM")
+        html_html = SAMPLE_HTML.replace("Test Article Title", "Test Article HTML")
+
+        _write_html(tmp_path, "dup_article.htm", html_htm)
+        _write_html(tmp_path, "dup_article.html", html_html)
+
+        articles, _ = load_articles(tmp_path)
+        assert len(articles) == 1
+        assert articles[0]["title"] == "Test Article HTML"
 
 
 # ---------------------------------------------------------------------------
