@@ -766,7 +766,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <div class="result-card{% if not in_ai %} not-in-ai{% endif %}">
               <div class="card-title-row">
                 {% if article.article_id %}
-                  <a class="card-title" href="{{ kb_base_url }}/{{ article.article_id }}" target="_blank" title="{{ article.title }}">{{ article.title }}</a>
+                  <a class="card-title" href="{{ kb_base_url }}/{{ article.article_id }}"
+                     title="{{ article.title }}">{{ article.title }}</a>
                 {% else %}
                   <span class="card-title" title="{{ article.title }}">{{ article.title }}</span>
                 {% endif %}
@@ -824,6 +825,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <button type="submit" class="btn-refine">→</button>
           </form>
         </div>
+
     </div>
 
   </div>
@@ -839,7 +841,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     function buildCard(a) {
       const notInAiClass = a.in_ai ? '' : ' not-in-ai';
       const titleHtml = a.url
-        ? `<a class="card-title" href="${esc(a.url)}" target="_blank" title="${esc(a.title)}">${esc(a.title)}</a>`
+        ? `<a class="card-title" href="${esc(a.url)}" title="${esc(a.title)}">${esc(a.title)}</a>`
         : `<span class="card-title" title="${esc(a.title)}">${esc(a.title)}</span>`;
       const staleHtml = a.is_stale
         ? ` <span class="stale-badge">⚠ Last updated ${esc(String(a.updated).slice(0, 4))}</span>`
