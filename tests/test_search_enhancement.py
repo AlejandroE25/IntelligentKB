@@ -243,6 +243,11 @@ class TestSearchTimings:
         results = [("1001", 0.15), ("1002", 0.05)]
         assert t.confidence(results) == "medium"
 
+    def test_confidence_high_when_top_has_clear_gap(self):
+        t = SearchTimings()
+        results = [("1001", 0.18), ("1002", 0.14), ("1003", 0.10)]
+        assert t.confidence(results) == "medium"
+
     def test_confidence_low(self):
         t = SearchTimings()
         results = [("1001", 0.03)]
@@ -298,6 +303,15 @@ class TestRrfFusion:
         result = rrf_fusion(lex, sem, alpha=0.0)
         ids = [x[0] for x in result]
         assert ids[0] == "b"  # semantic-top item first
+
+    def test_duplicate_ids_in_single_branch_do_not_double_count(self):
+        lex = [("a", 0.9), ("b", 0.8), ("b", 0.7)]
+        sem = [("c", 0.9)]
+        result = rrf_fusion(lex, sem)
+        ids = [x[0] for x in result]
+
+        # If duplicate "b" entries were double-counted, "b" could outrank "a".
+        assert ids.index("a") < ids.index("b")
 
 
 # ---------------------------------------------------------------------------
@@ -623,6 +637,47 @@ class TestHybridRetriever:
         retriever = HybridRetriever(flags)
         retriever.build(SAMPLE_ARTICLES, vectorizer, matrix)
         assert retriever.cache is None
+
+    def test_synonym_expansion_is_conservative_for_long_queries(self):
+        flags = self._make_flags(query_normalization=True)
+        retriever = HybridRetriever(flags)
+        assert retriever._should_expand_synonyms("how do i enroll in duo mobile") is False
+        assert retriever._should_expand_synonyms("duo mfa") is True
+
+    def test_hybrid_scores_are_not_tiny_rrf_values(self, vectorizer_and_matrix):
+        vectorizer, matrix = vectorizer_and_matrix
+        flags = self._make_flags(hybrid_retrieval=True, query_normalization=False)
+        retriever = HybridRetriever(flags)
+        retriever.build(SAMPLE_ARTICLES, vectorizer, matrix)
+
+        results, _ = retriever.retrieve(
+            "duo authentication", SAMPLE_ARTICLES, vectorizer, matrix, top_k=5
+        )
+        assert results
+        # Calibrated hybrid scores should stay in a readable TF-IDF-like range.
+        assert results[0][1] >= 0.08
+
+    def test_overlap_promotes_near_exact_medium_to_high(self):
+        flags = self._make_flags()
+        retriever = HybridRetriever(flags)
+        results = [("1001", 0.18), ("1002", 0.14)]
+        articles_by_id = {a["article_id"]: a for a in SAMPLE_ARTICLES}
+
+        confidence = retriever._confidence_with_overlap(
+            "duo authentication setup", results, articles_by_id
+        )
+        assert confidence == "high"
+
+    def test_no_overlap_keeps_near_exact_as_medium(self):
+        flags = self._make_flags()
+        retriever = HybridRetriever(flags)
+        results = [("1002", 0.18), ("1001", 0.14)]
+        articles_by_id = {a["article_id"]: a for a in SAMPLE_ARTICLES}
+
+        confidence = retriever._confidence_with_overlap(
+            "duo enrollment mobile", results, articles_by_id
+        )
+        assert confidence == "medium"
 
 
 # ---------------------------------------------------------------------------

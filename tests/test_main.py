@@ -251,7 +251,12 @@ class TestLoadArticles:
     def test_loads_html_files(self, tmp_path):
         from main import load_articles
         _write_html(tmp_path, "article1.html", SAMPLE_HTML)
-        _write_html(tmp_path, "article2.html", FRESH_HTML)
+        second = (
+            FRESH_HTML
+            .replace("resultc.php?action=7&amp;id=99999", "resultc.php?action=7&amp;id=99998")
+            .replace("<div class=\"doc-attr-value\">99999</div>", "<div class=\"doc-attr-value\">99998</div>")
+        )
+        _write_html(tmp_path, "article2.html", second)
         articles, contacts = load_articles(tmp_path)
         assert len(articles) == 2
         assert contacts == ""
@@ -283,6 +288,19 @@ class TestLoadArticles:
         articles, contacts = load_articles(tmp_path)
         assert articles == []
         assert contacts == ""
+
+    def test_deduplicates_same_article_id_across_htm_and_html(self, tmp_path):
+        from main import load_articles
+
+        html_htm = SAMPLE_HTML.replace("Test Article Title", "Test Article HTM")
+        html_html = SAMPLE_HTML.replace("Test Article Title", "Test Article HTML")
+
+        _write_html(tmp_path, "dup_article.htm", html_htm)
+        _write_html(tmp_path, "dup_article.html", html_html)
+
+        articles, _ = load_articles(tmp_path)
+        assert len(articles) == 1
+        assert articles[0]["title"] == "Test Article HTML"
 
 
 # ---------------------------------------------------------------------------
@@ -842,6 +860,56 @@ class TestSearchEndpoint:
             data = resp.get_json()
             for a in data["articles"]:
                 assert a["badge_label"] in ("High", "Medium", "Low")
+
+    def test_top_result_promoted_to_high_when_gap_is_clear(self):
+        from main import create_app, build_article_index
+
+        articles = [
+            _make_mock_article("1", title="Duo Enrollment", content="duo enrollment setup"),
+            _make_mock_article("2", title="Duo Troubleshooting", content="duo troubleshooting"),
+        ]
+        vectorizer, matrix = build_article_index(articles)
+        client = MagicMock()
+        app = create_app(client, articles, vectorizer, matrix)
+        app.config["TESTING"] = True
+
+        mocked_display = [
+            (articles[0], 0.18),
+            (articles[1], 0.14),
+        ]
+        with patch("main.select_display_articles", return_value=mocked_display):
+            with app.test_client() as c:
+                resp = c.get("/search?q=duo+enrollment")
+
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["articles"][0]["badge_label"] == "High"
+        assert data["articles"][0]["badge_class"] == "badge-high"
+
+    def test_top_result_not_promoted_without_overlap(self):
+        from main import create_app, build_article_index
+
+        articles = [
+            _make_mock_article("1", title="VPN Setup", keywords="vpn cisco", content="vpn install"),
+            _make_mock_article("2", title="Duo Enrollment", keywords="duo mfa", content="duo setup"),
+        ]
+        vectorizer, matrix = build_article_index(articles)
+        client = MagicMock()
+        app = create_app(client, articles, vectorizer, matrix)
+        app.config["TESTING"] = True
+
+        mocked_display = [
+            (articles[0], 0.18),
+            (articles[1], 0.14),
+        ]
+        with patch("main.select_display_articles", return_value=mocked_display):
+            with app.test_client() as c:
+                resp = c.get("/search?q=duo+enrollment")
+
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["articles"][0]["badge_label"] == "Medium"
+        assert data["articles"][0]["badge_class"] == "badge-medium"
 
     def test_returns_json_content_type(self):
         app = self._make_app()

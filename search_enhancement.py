@@ -87,6 +87,8 @@ DOMAIN_SYNONYMS: Dict[str, List[str]] = {
     "duo": ["two-factor", "2fa", "mfa", "multi-factor", "authenticator"],
     "mfa": ["duo", "two-factor", "2fa", "multi-factor", "authenticator"],
     "2fa": ["duo", "mfa", "two-factor", "multi-factor"],
+    "enroll": ["enrollment", "register", "setup", "activate"],
+    "enrollment": ["enroll", "register", "setup", "activate"],
     "netid": ["username", "login", "account", "net id", "credentials"],
     "net id": ["netid", "username", "login", "account", "credentials"],
     "vpn": ["virtual private network", "anyconnect", "cisco", "remote access"],
@@ -453,11 +455,25 @@ def rrf_fusion(
     """
     scores: Dict[str, float] = {}
 
-    for rank, (aid, _) in enumerate(lexical_results):
-        scores[aid] = scores.get(aid, 0.0) + alpha / (k + rank + 1)
+    # Ignore duplicate IDs within each branch so repeated source articles do
+    # not receive disproportionate weight.
+    seen_lexical: set[str] = set()
+    lexical_rank = 0
+    for aid, _ in lexical_results:
+        if aid in seen_lexical:
+            continue
+        seen_lexical.add(aid)
+        scores[aid] = scores.get(aid, 0.0) + alpha / (k + lexical_rank + 1)
+        lexical_rank += 1
 
-    for rank, (aid, _) in enumerate(semantic_results):
-        scores[aid] = scores.get(aid, 0.0) + (1.0 - alpha) / (k + rank + 1)
+    seen_semantic: set[str] = set()
+    semantic_rank = 0
+    for aid, _ in semantic_results:
+        if aid in seen_semantic:
+            continue
+        seen_semantic.add(aid)
+        scores[aid] = scores.get(aid, 0.0) + (1.0 - alpha) / (k + semantic_rank + 1)
+        semantic_rank += 1
 
     return sorted(scores.items(), key=lambda x: x[1], reverse=True)
 
@@ -615,6 +631,101 @@ class HybridRetriever:
 
         logger.info("HybridRetriever ready (flags=%s)", self._flags)
 
+    def _should_expand_synonyms(self, normalized_query: str) -> bool:
+        """Return True when synonym expansion is likely to help recall.
+
+        Expansion is intentionally conservative to avoid intent drift on longer,
+        more specific natural-language queries.
+        """
+        tokens = normalized_query.split()
+        if not tokens:
+            return False
+        return len(tokens) <= 4
+
+    def _hybrid_display_score(
+        self,
+        article_id: str,
+        lexical_scores: Dict[str, float],
+        semantic_scores: Dict[str, float],
+    ) -> float:
+        """Map fused rankings to a TF-IDF-like score scale for UI confidence.
+
+        RRF scores are rank-only and very small (around 0.01-0.03), which makes
+        static TF-IDF thresholds look artificially "low" in the UI. Prefer the
+        lexical score when available; otherwise map semantic cosine to a modest
+        TF-IDF-like range.
+        """
+        lex = lexical_scores.get(article_id, 0.0)
+        if lex > 0.0:
+            return float(lex)
+
+        sem = max(semantic_scores.get(article_id, 0.0), 0.0)
+        return float(min(0.25, sem * 0.25))
+
+    @staticmethod
+    def _token_root(token: str) -> str:
+        """Apply light stemming for overlap checks (e.g., enroll/enrollment)."""
+        for suffix in ("ments", "ment", "ingly", "edly", "ing", "ed", "es", "s"):
+            if token.endswith(suffix) and (len(token) - len(suffix)) >= 4:
+                return token[: -len(suffix)]
+        return token
+
+    def _keyword_roots(self, text: str) -> set[str]:
+        stop = {
+            "how", "do", "i", "in", "to", "the", "a", "an", "for", "and",
+            "or", "of", "on", "with", "my", "is", "are", "can", "you", "me",
+            "help", "please", "issue", "problem", "not", "from", "at", "it",
+        }
+        tokens = re.findall(r"[a-z0-9]+", text.lower())
+        roots: set[str] = set()
+        for token in tokens:
+            if len(token) < 3 or token in stop:
+                continue
+            roots.add(self._token_root(token))
+        return roots
+
+    def _has_keyword_overlap(self, query: str, article: Dict[str, Any]) -> bool:
+        """Return True when query terms significantly overlap article metadata."""
+        query_roots = self._keyword_roots(query)
+        if not query_roots:
+            return False
+
+        article_text = (
+            f"{article.get('title', '')} "
+            f"{article.get('keywords', '')} "
+            f"{article.get('content', '')[:1200]}"
+        )
+        article_roots = self._keyword_roots(article_text)
+        overlap = query_roots & article_roots
+
+        if len(overlap) >= 2:
+            return True
+        if len(overlap) == 1 and len(query_roots) <= 2:
+            return True
+        return False
+
+    def _confidence_with_overlap(
+        self,
+        query: str,
+        results: List[Tuple[str, float]],
+        articles_by_id: Dict[str, Dict[str, Any]],
+    ) -> str:
+        """Promote near-exact top hits to high confidence only with term overlap."""
+        base_confidence = SearchTimings().confidence(results)
+        if base_confidence != "medium" or len(results) < 2:
+            return base_confidence
+
+        top_score = results[0][1]
+        second_score = results[1][1]
+        if top_score < 0.16 or (top_score - second_score) < 0.03:
+            return base_confidence
+
+        top_article = articles_by_id.get(results[0][0])
+        if top_article and self._has_keyword_overlap(query, top_article):
+            return "high"
+
+        return base_confidence
+
     # ------------------------------------------------------------------
     # Retrieve
     # ------------------------------------------------------------------
@@ -636,14 +747,17 @@ class HybridRetriever:
         """
         timings = SearchTimings()
         t_total_start = time.perf_counter()
+        articles_by_id = {a.get("article_id", ""): a for a in articles if a.get("article_id")}
 
         # ── 1. Query normalisation ─────────────────────────────────────
         elapsed: list = [0.0]
         with _timer(elapsed):
             if self._flags.query_normalization:
-                norm_query = self._normalizer.normalize(
-                    query, use_synonyms=True, use_typo=False
-                )
+                base_query = self._normalizer.basic_normalize(query)
+                if self._should_expand_synonyms(base_query):
+                    norm_query = self._normalizer.expand_synonyms(base_query)
+                else:
+                    norm_query = base_query
             else:
                 norm_query = query
         timings.normalization_ms = elapsed[0]
@@ -683,7 +797,16 @@ class HybridRetriever:
         # ── 5. Fusion ──────────────────────────────────────────────────
         with _timer(elapsed):
             if self._flags.hybrid_retrieval and semantic:
-                fused = rrf_fusion(lexical, semantic)[:top_k]
+                fused_ranked = rrf_fusion(lexical, semantic)[:top_k]
+                lexical_map = dict(lexical)
+                semantic_map = dict(semantic)
+                fused = [
+                    (
+                        aid,
+                        self._hybrid_display_score(aid, lexical_map, semantic_map),
+                    )
+                    for aid, _ in fused_ranked
+                ]
             else:
                 fused = lexical[:top_k]
         timings.fusion_ms = elapsed[0]
@@ -701,7 +824,7 @@ class HybridRetriever:
             self._cache.set(norm_query, fused, self.CONFIG_VERSION)
 
         timings.total_ms = (time.perf_counter() - t_total_start) * 1_000.0
-        confidence = timings.confidence(fused)
+        confidence = self._confidence_with_overlap(query, fused, articles_by_id)
         log_retrieval(query, norm_query, timings, len(fused), confidence)
 
         # ── 8. Typo-corrected retry when lexical confidence is low ─────
@@ -711,8 +834,10 @@ class HybridRetriever:
             and not semantic  # only in purely lexical mode
         ):
             typo_query = self._normalizer.normalize(
-                query, use_synonyms=True, use_typo=True
+                query, use_synonyms=False, use_typo=True
             )
+            if self._should_expand_synonyms(typo_query):
+                typo_query = self._normalizer.expand_synonyms(typo_query)
             if typo_query != norm_query:
                 logger.debug(
                     "Low confidence; retrying with typo correction: %r -> %r",
@@ -728,7 +853,11 @@ class HybridRetriever:
                     fused = lexical_retry[:top_k]
                     timings.total_ms = (time.perf_counter() - t_total_start) * 1_000.0
                     log_retrieval(
-                        query, typo_query, timings, len(fused), timings.confidence(fused)
+                        query,
+                        typo_query,
+                        timings,
+                        len(fused),
+                        self._confidence_with_overlap(query, fused, articles_by_id),
                     )
 
         return fused, timings

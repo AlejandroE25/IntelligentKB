@@ -248,14 +248,29 @@ def load_articles(articles_dir: Path) -> tuple[list[dict[str, str]], str]:
     content of ``contacts.html`` (if present) and ``articles`` contains everything
     else.  The contacts file is excluded from the TF-IDF index.
     """
-    articles = []
+    articles_by_key: dict[str, dict[str, str]] = {}
     contacts_text = ""
     for ext in ("*.htm", "*.html"):
         for filepath in sorted(articles_dir.glob(ext)):
             if filepath.name.lower() == CONTACTS_FILENAME:
                 contacts_text = parse_article(filepath)["content"]
             else:
-                articles.append(parse_article(filepath))
+                parsed = parse_article(filepath)
+                article_id = parsed.get("article_id", "").strip()
+                dedupe_key = article_id if article_id else parsed["filename"].lower()
+
+                existing = articles_by_key.get(dedupe_key)
+                if existing is None:
+                    articles_by_key[dedupe_key] = parsed
+                    continue
+
+                # Prefer .html over .htm when both represent the same article.
+                existing_is_htm = existing["filename"].lower().endswith(".htm")
+                parsed_is_html = parsed["filename"].lower().endswith(".html")
+                if existing_is_htm and parsed_is_html:
+                    articles_by_key[dedupe_key] = parsed
+
+    articles = list(articles_by_key.values())
     return articles, contacts_text
 
 # ---------------------------------------------------------------------------
@@ -746,13 +761,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           <p class="empty-state">No articles found for this query.</p>
         {% else %}
           {% for article, score in display_articles %}
-            {% if score >= relevance_high %}
-              {% set badge_class = "badge-high" %}{% set badge_label = "High" %}
-            {% elif score >= relevance_medium %}
-              {% set badge_class = "badge-medium" %}{% set badge_label = "Medium" %}
-            {% else %}
-              {% set badge_class = "badge-low" %}{% set badge_label = "Low" %}
-            {% endif %}
+            {% set badge_label, badge_class = classify_badge(score, loop.index0, display_scores, query, article) %}
             {% set in_ai = loop.index0 < top_k %}
             <div class="result-card{% if not in_ai %} not-in-ai{% endif %}">
               <div class="card-title-row">
@@ -1171,6 +1180,66 @@ def create_app(
 
     app.jinja_env.filters["is_stale"] = _is_stale_filter
 
+    def _token_root(token: str) -> str:
+      for suffix in ("ments", "ment", "ingly", "edly", "ing", "ed", "es", "s"):
+        if token.endswith(suffix) and (len(token) - len(suffix)) >= 4:
+          return token[: -len(suffix)]
+      return token
+
+    def _keyword_roots(text: str) -> set[str]:
+      stop = {
+        "how", "do", "i", "in", "to", "the", "a", "an", "for", "and",
+        "or", "of", "on", "with", "my", "is", "are", "can", "you", "me",
+        "help", "please", "issue", "problem", "not", "from", "at", "it",
+      }
+      tokens = re.findall(r"[a-z0-9]+", text.lower())
+      roots: set[str] = set()
+      for token in tokens:
+        if len(token) < 3 or token in stop:
+          continue
+        roots.add(_token_root(token))
+      return roots
+
+    def _has_keyword_overlap(query: str, article: dict[str, str]) -> bool:
+      query_roots = _keyword_roots(query)
+      if not query_roots:
+        return False
+
+      article_text = (
+        f"{article.get('title', '')} "
+        f"{article.get('keywords', '')} "
+        f"{article.get('content', '')[:1200]}"
+      )
+      article_roots = _keyword_roots(article_text)
+      overlap = query_roots & article_roots
+
+      if len(overlap) >= 2:
+        return True
+      if len(overlap) == 1 and len(query_roots) <= 2:
+        return True
+      return False
+
+    def _classify_relevance_badge(
+      score: float,
+      rank: int,
+      all_scores: list[float],
+      query_text: str,
+      article: dict[str, str],
+    ) -> tuple[str, str]:
+      """Classify relevance badges with overlap-aware near-exact promotion."""
+      if score >= RELEVANCE_HIGH:
+        return "High", "badge-high"
+
+      if rank == 0 and score >= 0.16:
+        second = all_scores[1] if len(all_scores) > 1 else 0.0
+        if (score - second) >= 0.03 and _has_keyword_overlap(query_text, article):
+          return "High", "badge-high"
+
+      if score >= RELEVANCE_MEDIUM:
+        return "Medium", "badge-medium"
+
+      return "Low", "badge-low"
+
     def _render(
         query: str = "",
         display_articles=None,
@@ -1178,16 +1247,19 @@ def create_app(
         ai_footer: str = "",
         ai_error: str = "",
     ):
+        display_scores = [score for _, score in display_articles] if display_articles else []
         return render_template_string(
             HTML_TEMPLATE,
             query=query,
             display_articles=display_articles,
+            display_scores=display_scores,
             ai_response=ai_response,
             ai_footer=ai_footer,
             ai_error=ai_error,
             top_k=TOP_K_ARTICLES,
             relevance_high=RELEVANCE_HIGH,
             relevance_medium=RELEVANCE_MEDIUM,
+            classify_badge=_classify_relevance_badge,
             kb_base_url=KB_BASE_URL,
         )
 
@@ -1326,14 +1398,10 @@ def create_app(
             return jsonify({"articles": [], "count": 0})
 
         display = _get_display_articles(q)
+        display_scores = [score for _, score in display]
         result = []
         for i, (article, score) in enumerate(display):
-            if score >= RELEVANCE_HIGH:
-                badge_label, badge_class = "High", "badge-high"
-            elif score >= RELEVANCE_MEDIUM:
-                badge_label, badge_class = "Medium", "badge-medium"
-            else:
-                badge_label, badge_class = "Low", "badge-low"
+            badge_label, badge_class = _classify_relevance_badge(score, i, display_scores, q, article)
             result.append({
                 "article_id": article["article_id"],
                 "title": article["title"],
