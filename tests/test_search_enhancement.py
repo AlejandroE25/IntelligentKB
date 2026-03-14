@@ -243,6 +243,11 @@ class TestSearchTimings:
         results = [("1001", 0.15), ("1002", 0.05)]
         assert t.confidence(results) == "medium"
 
+    def test_confidence_high_when_top_has_clear_gap(self):
+        t = SearchTimings()
+        results = [("1001", 0.18), ("1002", 0.14), ("1003", 0.10)]
+        assert t.confidence(results) == "high"
+
     def test_confidence_low(self):
         t = SearchTimings()
         results = [("1001", 0.03)]

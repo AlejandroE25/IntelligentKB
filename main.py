@@ -761,13 +761,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           <p class="empty-state">No articles found for this query.</p>
         {% else %}
           {% for article, score in display_articles %}
-            {% if score >= relevance_high %}
-              {% set badge_class = "badge-high" %}{% set badge_label = "High" %}
-            {% elif score >= relevance_medium %}
-              {% set badge_class = "badge-medium" %}{% set badge_label = "Medium" %}
-            {% else %}
-              {% set badge_class = "badge-low" %}{% set badge_label = "Low" %}
-            {% endif %}
+            {% set badge_label, badge_class = classify_badge(score, loop.index0, display_scores) %}
             {% set in_ai = loop.index0 < top_k %}
             <div class="result-card{% if not in_ai %} not-in-ai{% endif %}">
               <div class="card-title-row">
@@ -1186,25 +1180,47 @@ def create_app(
 
     app.jinja_env.filters["is_stale"] = _is_stale_filter
 
+    def _classify_relevance_badge(
+      score: float,
+      rank: int,
+      all_scores: list[float],
+    ) -> tuple[str, str]:
+      """Classify relevance badges with a near-exact top-hit promotion rule."""
+      if score >= RELEVANCE_HIGH:
+        return "High", "badge-high"
+
+      if rank == 0 and score >= 0.16:
+        second = all_scores[1] if len(all_scores) > 1 else 0.0
+        if (score - second) >= 0.03:
+          return "High", "badge-high"
+
+      if score >= RELEVANCE_MEDIUM:
+        return "Medium", "badge-medium"
+
+      return "Low", "badge-low"
+
     def _render(
-        query: str = "",
-        display_articles=None,
-        ai_response: str | None = None,
-        ai_footer: str = "",
-        ai_error: str = "",
+      query: str = "",
+      display_articles=None,
+      ai_response: str | None = None,
+      ai_footer: str = "",
+      ai_error: str = "",
     ):
-        return render_template_string(
-            HTML_TEMPLATE,
-            query=query,
-            display_articles=display_articles,
-            ai_response=ai_response,
-            ai_footer=ai_footer,
-            ai_error=ai_error,
-            top_k=TOP_K_ARTICLES,
-            relevance_high=RELEVANCE_HIGH,
-            relevance_medium=RELEVANCE_MEDIUM,
-            kb_base_url=KB_BASE_URL,
-        )
+      display_scores = [score for _, score in display_articles] if display_articles else []
+      return render_template_string(
+        HTML_TEMPLATE,
+        query=query,
+        display_articles=display_articles,
+        display_scores=display_scores,
+        ai_response=ai_response,
+        ai_footer=ai_footer,
+        ai_error=ai_error,
+        top_k=TOP_K_ARTICLES,
+        relevance_high=RELEVANCE_HIGH,
+        relevance_medium=RELEVANCE_MEDIUM,
+        classify_badge=_classify_relevance_badge,
+        kb_base_url=KB_BASE_URL,
+      )
 
     # ------------------------------------------------------------------
     # Retrieval helpers (enhanced path when retriever is provided)
@@ -1341,14 +1357,10 @@ def create_app(
             return jsonify({"articles": [], "count": 0})
 
         display = _get_display_articles(q)
+        display_scores = [score for _, score in display]
         result = []
         for i, (article, score) in enumerate(display):
-            if score >= RELEVANCE_HIGH:
-                badge_label, badge_class = "High", "badge-high"
-            elif score >= RELEVANCE_MEDIUM:
-                badge_label, badge_class = "Medium", "badge-medium"
-            else:
-                badge_label, badge_class = "Low", "badge-low"
+            badge_label, badge_class = _classify_relevance_badge(score, i, display_scores)
             result.append({
                 "article_id": article["article_id"],
                 "title": article["title"],

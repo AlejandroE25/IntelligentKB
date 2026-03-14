@@ -861,6 +861,31 @@ class TestSearchEndpoint:
             for a in data["articles"]:
                 assert a["badge_label"] in ("High", "Medium", "Low")
 
+    def test_top_result_promoted_to_high_when_gap_is_clear(self):
+        from main import create_app, build_article_index
+
+        articles = [
+            _make_mock_article("1", title="Duo Enrollment", content="duo enrollment setup"),
+            _make_mock_article("2", title="Duo Troubleshooting", content="duo troubleshooting"),
+        ]
+        vectorizer, matrix = build_article_index(articles)
+        client = MagicMock()
+        app = create_app(client, articles, vectorizer, matrix)
+        app.config["TESTING"] = True
+
+        mocked_display = [
+            (articles[0], 0.18),
+            (articles[1], 0.14),
+        ]
+        with patch("main.select_display_articles", return_value=mocked_display):
+            with app.test_client() as c:
+                resp = c.get("/search?q=duo+enrollment")
+
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["articles"][0]["badge_label"] == "High"
+        assert data["articles"][0]["badge_class"] == "badge-high"
+
     def test_returns_json_content_type(self):
         app = self._make_app()
         with app.test_client() as c:

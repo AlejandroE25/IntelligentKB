@@ -229,12 +229,19 @@ class SearchTimings:
         }
 
     def confidence(self, results: List[Tuple[str, float]]) -> str:
-        """Return a simple confidence indicator based on top score."""
+        """Return confidence based on top score and separation from runner-up."""
         if not results:
             return "none"
         top_score = results[0][1]
         if top_score >= 0.20:
             return "high"
+
+        # Promote near-threshold top hits when they are clearly separated.
+        if len(results) > 1:
+            second_score = results[1][1]
+            if top_score >= 0.16 and (top_score - second_score) >= 0.03:
+                return "high"
+
         if top_score >= 0.08:
             return "medium"
         return "low"
