@@ -1015,6 +1015,178 @@ class TestAiEndpoint:
 
 
 # ---------------------------------------------------------------------------
+# GET /brave  (Brave Search JSON endpoint)
+# ---------------------------------------------------------------------------
+
+class TestBraveEndpoint:
+    def _make_app(self, brave_api_key: str = ""):
+        from main import create_app, build_article_index
+        articles = [_make_mock_article("1", content="wifi wireless IllinoisNet")]
+        vectorizer, matrix = build_article_index(articles)
+        client = MagicMock()
+        app = create_app(client, articles, vectorizer, matrix, brave_api_key=brave_api_key)
+        app.config["TESTING"] = True
+        return app
+
+    def test_no_api_key_returns_unavailable(self):
+        app = self._make_app(brave_api_key="")
+        with app.test_client() as c:
+            resp = c.get("/brave?q=wifi+problem")
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["results"] == []
+            assert data["available"] is False
+
+    def test_empty_query_returns_empty_with_no_key(self):
+        app = self._make_app(brave_api_key="")
+        with app.test_client() as c:
+            resp = c.get("/brave?q=")
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["results"] == []
+            assert data["available"] is False
+
+    def test_empty_query_with_key_returns_empty(self):
+        app = self._make_app(brave_api_key="test-key")
+        with app.test_client() as c:
+            resp = c.get("/brave?q=")
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["results"] == []
+
+    def test_with_api_key_calls_fetch_brave_results(self):
+        from unittest.mock import patch
+        app = self._make_app(brave_api_key="test-key")
+        mock_results = [
+            {
+                "title": "Someone with a similar issue",
+                "url": "https://example.com/forum",
+                "description": "Describes the same wifi problem.",
+            }
+        ]
+        with patch("main.fetch_brave_results", return_value=mock_results):
+            with app.test_client() as c:
+                resp = c.get("/brave?q=wifi+not+working")
+                data = resp.get_json()
+                assert data["available"] is True
+                assert len(data["results"]) == 1
+                assert data["results"][0]["title"] == "Someone with a similar issue"
+
+    def test_returns_json_content_type(self):
+        app = self._make_app()
+        with app.test_client() as c:
+            resp = c.get("/brave?q=wifi")
+            assert "application/json" in resp.content_type
+
+    def test_brave_section_in_html_when_key_set(self):
+        """When brave_api_key is set, the template renders the brave-section div."""
+        from main import create_app, build_article_index
+        articles = [_make_mock_article("1", content="wifi wireless")]
+        vectorizer, matrix = build_article_index(articles)
+        client = MagicMock()
+        app = create_app(client, articles, vectorizer, matrix, brave_api_key="test-key")
+        app.config["TESTING"] = True
+        with app.test_client() as c:
+            resp = c.get("/")
+            body = resp.data.decode()
+            assert 'id="brave-section"' in body
+            assert "Users with Similar Issues" in body
+
+    def test_brave_section_absent_when_no_key(self):
+        """Without a brave_api_key the template does not render the brave-section div."""
+        from main import create_app, build_article_index
+        articles = [_make_mock_article("1", content="wifi wireless")]
+        vectorizer, matrix = build_article_index(articles)
+        client = MagicMock()
+        app = create_app(client, articles, vectorizer, matrix, brave_api_key="")
+        app.config["TESTING"] = True
+        with app.test_client() as c:
+            resp = c.get("/")
+            body = resp.data.decode()
+            # The div should not be rendered (the JS string literal is still present)
+            assert 'id="brave-section"' not in body
+
+
+# ---------------------------------------------------------------------------
+# fetch_brave_results  (unit tests)
+# ---------------------------------------------------------------------------
+
+class TestFetchBraveResults:
+    def test_returns_empty_list_on_url_error(self):
+        import urllib.error
+        from unittest.mock import patch
+        from main import fetch_brave_results
+
+        with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("connection refused")):
+            results = fetch_brave_results("test query", "test-key")
+        assert results == []
+
+    def test_returns_empty_list_on_os_error(self):
+        from unittest.mock import patch
+        from main import fetch_brave_results
+
+        with patch("urllib.request.urlopen", side_effect=OSError("timeout")):
+            results = fetch_brave_results("test query", "test-key")
+        assert results == []
+
+    def test_parses_web_results(self):
+        import json as json_mod
+        from unittest.mock import MagicMock, patch
+        from main import fetch_brave_results
+
+        payload = {
+            "web": {
+                "results": [
+                    {"title": "Title A", "url": "https://a.com", "description": "Desc A"},
+                    {"title": "Title B", "url": "https://b.com", "description": ""},
+                ]
+            }
+        }
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json_mod.dumps(payload).encode("utf-8")
+        mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+        mock_resp.__exit__ = MagicMock(return_value=False)
+
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            results = fetch_brave_results("test query", "test-key")
+
+        assert len(results) == 2
+        assert results[0] == {"title": "Title A", "url": "https://a.com", "description": "Desc A"}
+        assert results[1] == {"title": "Title B", "url": "https://b.com", "description": ""}
+
+    def test_returns_empty_list_for_missing_web_key(self):
+        import json as json_mod
+        from unittest.mock import MagicMock, patch
+        from main import fetch_brave_results
+
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json_mod.dumps({}).encode("utf-8")
+        mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+        mock_resp.__exit__ = MagicMock(return_value=False)
+
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            results = fetch_brave_results("test query", "test-key")
+        assert results == []
+
+    def test_respects_count_parameter(self):
+        """The count query parameter should be forwarded to the Brave API URL."""
+        import json as json_mod
+        from unittest.mock import MagicMock, call, patch
+        from main import fetch_brave_results
+
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json_mod.dumps({"web": {"results": []}}).encode("utf-8")
+        mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+        mock_resp.__exit__ = MagicMock(return_value=False)
+
+        with patch("urllib.request.urlopen", return_value=mock_resp) as mock_open:
+            fetch_brave_results("wifi problem", "test-key", count=3)
+            args, _ = mock_open.call_args
+            req = args[0]
+            assert "count=3" in req.full_url
+
+
+# ---------------------------------------------------------------------------
 # GET /articles  (articles listing page)
 # ---------------------------------------------------------------------------
 

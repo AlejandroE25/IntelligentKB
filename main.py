@@ -23,6 +23,9 @@ import os
 import re
 import secrets
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import date
 from pathlib import Path
 from typing import Optional
@@ -73,6 +76,12 @@ STALE_ARTICLE_YEARS = 2
 # TF-IDF cosine similarity thresholds for relevancy labels shown in the left panel.
 RELEVANCE_HIGH = 0.20
 RELEVANCE_MEDIUM = 0.08
+
+# Brave Search integration: show "Users with Similar Issues" box when fewer than
+# BRAVE_MIN_HIGH_CONF articles receive a "High" relevancy badge.
+BRAVE_SEARCH_API_URL = "https://api.search.brave.com/res/v1/web/search"
+BRAVE_MIN_HIGH_CONF = 1   # threshold (exclusive) of High-confidence KB articles
+BRAVE_RESULT_COUNT = 5    # number of Brave Search results to request
 
 SYSTEM_PROMPT_HEADER = (
     "You are a help desk assistant for University of Illinois Technology Services.\n"
@@ -342,6 +351,38 @@ def select_display_articles(
 
     top_indices = np.argsort(scores)[::-1][: min(display_k, len(articles))]
     return [(articles[i], float(scores[i])) for i in top_indices]
+
+
+def fetch_brave_results(query: str, api_key: str, count: int = BRAVE_RESULT_COUNT) -> list[dict]:
+    """Query the Brave Search API and return a list of web results.
+
+    Each result is a dict with keys: ``title``, ``url``, ``description``.
+    Returns an empty list if the API call fails for any reason.
+    """
+    params = urllib.parse.urlencode({"q": query, "count": count})
+    url = f"{BRAVE_SEARCH_API_URL}?{params}"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "application/json",
+            "X-Subscription-Token": api_key,
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:  # noqa: S310
+            data = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, OSError) as exc:
+        logging.warning("Brave Search request failed: %s", exc)
+        return []
+
+    return [
+        {
+            "title": r.get("title", ""),
+            "url": r.get("url", ""),
+            "description": r.get("description", ""),
+        }
+        for r in data.get("web", {}).get("results", [])
+    ]
 
 
 def build_system_prompt(articles: list[dict[str, str]], contacts_text: str = "") -> str:
@@ -732,6 +773,53 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     }
     .btn-refine:hover { background: #484848; }
     .btn-refine:active { border-style: inset; }
+
+    /* ── BRAVE SEARCH SECTION ── */
+    #brave-section {
+      flex-shrink: 0;
+      max-height: 220px;
+      overflow-y: auto;
+      padding: 6px 8px;
+      border-top: 1px dashed #444;
+    }
+    .brave-header {
+      font-size: 11px;
+      font-weight: bold;
+      color: #888;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .brave-result {
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      padding: 5px 8px;
+      margin-bottom: 6px;
+    }
+    .brave-result-title {
+      font-size: 12px;
+      color: #7aaee8;
+      text-decoration: none;
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .brave-result-title:hover { color: #aaccff; text-decoration: underline; }
+    .brave-result-url {
+      font-size: 10px;
+      color: #666;
+      margin-top: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .brave-result-desc {
+      font-size: 11px;
+      color: #aaa;
+      margin-top: 3px;
+      line-height: 1.4;
+    }
   </style>
 </head>
 <body>
@@ -812,6 +900,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           <p class="empty-state">No response received.</p>
         {% endif %}
       </div>
+      {% if brave_available %}
+        <!-- Brave Search: populated by JS when KB confidence is low; lives outside
+             #ai-content so AI response updates never wipe it. -->
+        <div id="brave-section" style="display:none">
+          <div class="brave-header">🔍 Users with Similar Issues / Potential Solutions</div>
+          <div id="brave-list"></div>
+        </div>
+      {% endif %}
       {% if ai_response and not ai_error %}
         <div id="refine-area">
       {% else %}
@@ -871,10 +967,57 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     const refineForm    = document.getElementById('refine-form');
     const refineInput   = document.getElementById('refine-input');
     const refineQueryIn = refineForm ? refineForm.querySelector('[name="original_query"]') : null;
+    const braveSection  = document.getElementById('brave-section');
+    const braveList     = document.getElementById('brave-list');
 
     // ── State ─────────────────────────────────────────────────────────────────
     let searchTimer = null;
     let lastSearchQuery = '';
+
+    // ── Brave Search ──────────────────────────────────────────────────────────
+    const BRAVE_MIN_HIGH_CONF = {{ brave_min_high_conf }};
+
+    function renderBraveResults(results) {
+      if (!braveSection || !braveList) return;
+      if (!results || results.length === 0) {
+        braveSection.style.display = 'none';
+        return;
+      }
+      braveList.innerHTML = results.map(r => {
+        const titleHtml = r.url
+          ? `<a class="brave-result-title" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.title)}</a>`
+          : `<span class="brave-result-title">${esc(r.title)}</span>`;
+        const urlHtml  = r.url  ? `<div class="brave-result-url">${esc(r.url)}</div>`         : '';
+        const descHtml = r.description ? `<div class="brave-result-desc">${esc(r.description)}</div>` : '';
+        return `<div class="brave-result">${titleHtml}${urlHtml}${descHtml}</div>`;
+      }).join('');
+      braveSection.style.display = '';
+    }
+
+    async function doBraveSearch(q) {
+      if (!braveSection) return;
+      try {
+        const resp = await fetch(`/brave?q=${encodeURIComponent(q)}`);
+        const data = await resp.json();
+        if (data.available) {
+          renderBraveResults(data.results);
+        } else {
+          braveSection.style.display = 'none';
+        }
+      } catch (_) {
+        if (braveSection) braveSection.style.display = 'none';
+      }
+    }
+
+    function checkBraveSearch(articles, q) {
+      if (!braveSection) return;
+      const highCount = articles.filter(a => a.badge_label === 'High').length;
+      if (highCount < BRAVE_MIN_HIGH_CONF) {
+        doBraveSearch(q);
+      } else {
+        braveSection.style.display = 'none';
+      }
+    }
 
     // ── Live search (debounced 300 ms) ────────────────────────────────────────
     async function doSearch(q) {
@@ -882,6 +1025,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         resultsHeader.textContent = 'SEARCH RESULTS';
         resultsList.innerHTML = '<p class="empty-state">Enter a support question above to get started.</p>';
         lastSearchQuery = '';
+        if (braveSection) braveSection.style.display = 'none';
         return;
       }
       try {
@@ -897,6 +1041,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         if (aiEmpty && data.count > 0) {
           aiEmpty.textContent = 'Press Submit for AI troubleshooting steps.';
         }
+        // Trigger Brave search when KB confidence is low
+        checkBraveSearch(data.articles, q);
       } catch (err) {
         // Show a visible error in the left panel rather than failing silently
         resultsHeader.textContent = 'SEARCH RESULTS';
@@ -969,6 +1115,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         doAi(origQuery, refinement);
       });
     }
+
+    // ── On page load: check server-rendered badges (e.g. after /refine) ───────
+    window.addEventListener('DOMContentLoaded', function () {
+      const q = searchInput ? searchInput.value.trim() : '';
+      if (q && braveSection) {
+        const highBadges = document.querySelectorAll('.badge-high').length;
+        if (highBadges < BRAVE_MIN_HIGH_CONF) {
+          doBraveSearch(q);
+        }
+      }
+    });
   </script>
 </body>
 </html>
@@ -1158,6 +1315,7 @@ def create_app(
     doc_matrix: np.ndarray,
     contacts_text: str = "",
     retriever: Optional["HybridRetriever"] = None,  # type: ignore[name-defined]
+    brave_api_key: str = "",
 ) -> Flask:
     """Create and configure the Flask application.
 
@@ -1263,6 +1421,8 @@ def create_app(
             relevance_medium=RELEVANCE_MEDIUM,
             classify_badge=_classify_relevance_badge,
             kb_base_url=KB_BASE_URL,
+            brave_min_high_conf=BRAVE_MIN_HIGH_CONF,
+            brave_available=bool(brave_api_key),
         )
 
     # ------------------------------------------------------------------
@@ -1422,6 +1582,24 @@ def create_app(
         resp = jsonify({"articles": result, "count": len(result)})
         return resp
 
+    @app.route("/brave")
+    def brave():
+        """Return Brave Search web results for low-confidence queries.
+
+        Called by the frontend when fewer than BRAVE_MIN_HIGH_CONF articles
+        have a "High" relevancy badge.  Returns JSON::
+
+            {
+              "results":   [{"title": ..., "url": ..., "description": ...}, ...],
+              "available": true | false   # false when no API key is configured
+            }
+        """
+        q = request.args.get("q", "").strip()
+        if not q or not brave_api_key:
+            return jsonify({"results": [], "available": bool(brave_api_key)})
+        results = fetch_brave_results(q, brave_api_key)
+        return jsonify({"results": results, "available": True})
+
     @app.route("/ai", methods=["POST"])
     def ai():
         """Run the Claude agent and return JSON {response, footer, error}."""
@@ -1506,7 +1684,10 @@ def main() -> None:
             print(f"Search enhancements active: {flags}")
 
     client = anthropic.Anthropic(api_key=api_key)
-    app = create_app(client, articles, vectorizer, doc_matrix, contacts_text, retriever)
+    brave_api_key = os.environ.get("BRAVE_API_KEY", "")
+    if brave_api_key:
+        print("Brave Search integration enabled.")
+    app = create_app(client, articles, vectorizer, doc_matrix, contacts_text, retriever, brave_api_key)
 
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "5000"))
