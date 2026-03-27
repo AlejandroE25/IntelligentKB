@@ -67,6 +67,31 @@ You can customise the host and port with environment variables:
 HOST=0.0.0.0 PORT=8080 python main.py
 ```
 
+### Optional Runtime Cost Controls
+
+You can tune Claude request size/retry behavior with environment variables:
+
+```bash
+TOP_K_ARTICLES=3
+MAX_TOKENS=1024
+MAX_AGENT_TURNS=3
+MAX_ARTICLE_CHARS_IN_PROMPT=2500
+MAX_CONTACTS_CHARS_IN_PROMPT=1500
+ANTHROPIC_MAX_RETRIES=1
+```
+
+### Live Claude Integration Test (Real API Call)
+
+The default test suite uses mocks. To run a real Claude response check:
+
+```bash
+RUN_LIVE_CLAUDE_TESTS=1 ANTHROPIC_API_KEY=your_key_here \
+python -m pytest -q tests/test_live_claude.py
+```
+
+This test is skipped unless both `RUN_LIVE_CLAUDE_TESTS=1` and
+`ANTHROPIC_API_KEY` are set.
+
 ### Example session
 
 Type your issue in the text box and press **Enter** (or click **Send**).  

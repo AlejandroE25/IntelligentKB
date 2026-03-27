@@ -59,11 +59,19 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message
 ARTICLES_DIR = Path(__file__).parent / "articles"
 CONTACTS_FILENAME = "contacts.html"
 MODEL = "claude-sonnet-4-20250514"
-MAX_TOKENS = 2048
+MAX_TOKENS = int(os.environ.get("MAX_TOKENS", "1024"))
+
+# Guardrail: limit tool-loop turns so a single user request cannot spiral into
+# many Claude API calls when tool_use chains become long.
+MAX_AGENT_TURNS = int(os.environ.get("MAX_AGENT_TURNS", "3"))
+
+# Soft prompt budget controls to reduce input token spend.
+MAX_ARTICLE_CHARS_IN_PROMPT = int(os.environ.get("MAX_ARTICLE_CHARS_IN_PROMPT", "2500"))
+MAX_CONTACTS_CHARS_IN_PROMPT = int(os.environ.get("MAX_CONTACTS_CHARS_IN_PROMPT", "1500"))
 
 # Maximum number of articles sent to Claude per query.
 # Raising this improves recall at the cost of larger context windows.
-TOP_K_ARTICLES = 3
+TOP_K_ARTICLES = max(1, int(os.environ.get("TOP_K_ARTICLES", "3")))
 
 # Number of articles shown in the left search-results panel (independent of TOP_K_ARTICLES).
 DISPLAY_K_ARTICLES = 10
@@ -401,10 +409,16 @@ def build_system_prompt(articles: list[dict[str, str]], contacts_text: str = "")
         if article["keywords"]:
             lines.append(f"Keywords: {article['keywords']}")
         lines.append("---")
-        lines.append(article["content"])
+        content = article["content"]
+        if len(content) > MAX_ARTICLE_CHARS_IN_PROMPT:
+            content = f"{content[:MAX_ARTICLE_CHARS_IN_PROMPT]}\n\n[TRUNCATED]"
+        lines.append(content)
         lines.append("")  # blank separator between articles
     if contacts_text:
-        lines += ["", "--- [ESCALATION CONTACTS] ---", "", contacts_text, ""]
+        trimmed_contacts = contacts_text[:MAX_CONTACTS_CHARS_IN_PROMPT]
+        if len(contacts_text) > MAX_CONTACTS_CHARS_IN_PROMPT:
+            trimmed_contacts += "\n\n[TRUNCATED]"
+        lines += ["", "--- [ESCALATION CONTACTS] ---", "", trimmed_contacts, ""]
     return "\n".join(lines)
 
 
@@ -424,7 +438,10 @@ def _format_article_for_tool(article: dict[str, str]) -> str:
     if article.get("owner"):
         lines.append(f"Owner: {article['owner']}")
     lines.append("---")
-    lines.append(article["content"])
+    tool_content = article["content"]
+    if len(tool_content) > MAX_ARTICLE_CHARS_IN_PROMPT:
+        tool_content = f"{tool_content[:MAX_ARTICLE_CHARS_IN_PROMPT]}\n\n[TRUNCATED]"
+    lines.append(tool_content)
     return "\n".join(lines)
 
 
@@ -468,7 +485,7 @@ def run_agent(
     """
     messages = list(conversation)
 
-    while True:
+    for _ in range(MAX_AGENT_TURNS):
         response = client.messages.create(
             model=MODEL,
             max_tokens=MAX_TOKENS,
@@ -493,6 +510,8 @@ def run_agent(
             for tb in tool_use_blocks
         ]
         messages.append({"role": "user", "content": tool_results})
+
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -967,12 +986,21 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     const refineForm    = document.getElementById('refine-form');
     const refineInput   = document.getElementById('refine-input');
     const refineQueryIn = refineForm ? refineForm.querySelector('[name="original_query"]') : null;
+    const submitBtn     = searchForm ? searchForm.querySelector('.btn-submit') : null;
+    const refineBtn     = refineForm ? refineForm.querySelector('.btn-refine') : null;
     const braveSection  = document.getElementById('brave-section');
     const braveList     = document.getElementById('brave-list');
 
     // ── State ─────────────────────────────────────────────────────────────────
     let searchTimer = null;
     let lastSearchQuery = '';
+    let aiInFlight = false;
+    let activeAiController = null;
+
+    function setAiBusy(isBusy) {
+      if (submitBtn) submitBtn.disabled = isBusy;
+      if (refineBtn) refineBtn.disabled = isBusy;
+    }
 
     // ── Brave Search ──────────────────────────────────────────────────────────
     const BRAVE_MIN_HIGH_CONF = {{ brave_min_high_conf }};
@@ -1078,16 +1106,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     }
 
     async function doAi(query, refinement) {
+      if (activeAiController) {
+        activeAiController.abort();
+      }
+      const controller = new AbortController();
+      activeAiController = controller;
+      aiInFlight = true;
+      setAiBusy(true);
       showAiLoading();
       const body = new FormData();
       body.append('query', query);
       if (refinement) body.append('refinement', refinement);
       try {
-        const resp = await fetch('/ai', { method: 'POST', body });
+        const resp = await fetch('/ai', { method: 'POST', body, signal: controller.signal });
         const data = await resp.json();
         showAiResult(data, query);
       } catch (err) {
+        if (err && err.name === 'AbortError') return;
         aiContent.innerHTML = `<div id="ai-body" class="ai-error">Request failed: ${esc(String(err))}</div>`;
+      } finally {
+        if (activeAiController === controller) {
+          activeAiController = null;
+        }
+        aiInFlight = false;
+        setAiBusy(false);
       }
     }
 
@@ -1102,6 +1144,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         await doSearch(q);
       }
       // AI call fires without blocking — user can already read articles
+      if (aiInFlight) return;
       doAi(q);
     });
 
@@ -1112,6 +1155,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         const origQuery  = refineQueryIn ? refineQueryIn.value.trim() : '';
         const refinement = refineInput   ? refineInput.value.trim()   : '';
         if (!origQuery) return;
+        if (aiInFlight) return;
         doAi(origQuery, refinement);
       });
     }
@@ -1683,7 +1727,10 @@ def main() -> None:
             retriever.build(articles, vectorizer, doc_matrix)
             print(f"Search enhancements active: {flags}")
 
-    client = anthropic.Anthropic(api_key=api_key)
+    client = anthropic.Anthropic(
+        api_key=api_key,
+        max_retries=int(os.environ.get("ANTHROPIC_MAX_RETRIES", "1")),
+    )
     brave_api_key = os.environ.get("BRAVE_API_KEY", "")
     if brave_api_key:
         print("Brave Search integration enabled.")
