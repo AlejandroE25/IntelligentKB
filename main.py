@@ -1103,6 +1103,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       } else {
         aiContent.innerHTML = '<p class="empty-state">No response received.</p>';
       }
+      // Sync brave-section visibility using server-computed article confidence.
+      // This ensures brave shows/hides correctly even when doSearch was skipped.
+      if (braveSection && typeof data.high_conf_count !== 'undefined') {
+        if (data.high_conf_count < BRAVE_MIN_HIGH_CONF) {
+          doBraveSearch(query);
+        } else {
+          braveSection.style.display = 'none';
+        }
+      }
     }
 
     async function doAi(query, refinement) {
@@ -1646,11 +1655,11 @@ def create_app(
 
     @app.route("/ai", methods=["POST"])
     def ai():
-        """Run the Claude agent and return JSON {response, footer, error}."""
+        """Run the Claude agent and return JSON {response, footer, error, high_conf_count}."""
         query = request.form.get("query", "").strip()
         refinement = request.form.get("refinement", "").strip()
         if not query:
-            return jsonify({"response": None, "footer": "", "error": "No query provided."})
+            return jsonify({"response": None, "footer": "", "error": "No query provided.", "high_conf_count": 0})
 
         combined = (
             f"[Original query]: {query} / [Refinement]: {refinement}"
@@ -1659,9 +1668,14 @@ def create_app(
         )
         # Derive top articles from the original (un-refined) query
         display = _get_display_articles(query)
+        display_scores = [score for _, score in display]
+        high_conf_count = sum(
+            1 for i, (article, score) in enumerate(display)
+            if _classify_relevance_badge(score, i, display_scores, query, article)[0] == "High"
+        )
         top_articles = _get_top_articles_for_claude(display)
         ai_response, ai_footer, ai_error = _run_claude(combined, top_articles)
-        return jsonify({"response": ai_response, "footer": ai_footer, "error": ai_error})
+        return jsonify({"response": ai_response, "footer": ai_footer, "error": ai_error, "high_conf_count": high_conf_count})
 
     @app.route("/articles")
     def articles_index():
