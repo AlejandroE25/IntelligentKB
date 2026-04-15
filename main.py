@@ -570,6 +570,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       border: 1px solid #444;
     }
     #page-header .nav-link:hover { color: #aaccff; border-color: #7aaee8; }
+    .build-badge {
+      color: #666;
+      font-size: 11px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      margin-left: auto;
+    }
     #search-form {
       display: flex;
       flex: 1;
@@ -848,6 +855,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div id="page-header">
     <h1>KB AI Search</h1>
     <a class="nav-link" href="/articles">Browse Articles</a>
+    <span class="build-badge">Build {{ build_number }}</span>
     <form id="search-form" method="post" action="/">
       <input type="text" id="search-input" name="query"
              value="{{ query | e }}"
@@ -1241,6 +1249,12 @@ ARTICLES_TEMPLATE = """<!DOCTYPE html>
       font-size: 12px;
       margin-left: auto;
     }
+    .build-badge {
+      color: #666;
+      font-size: 11px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
 
     /* ── CONTENT ── */
     #content {
@@ -1315,6 +1329,7 @@ ARTICLES_TEMPLATE = """<!DOCTYPE html>
     <h1>KB AI Search</h1>
     <a class="nav-link" href="/">← Back to Search</a>
     <span class="header-count">{{ article_count }} article{{ 's' if article_count != 1 else '' }} indexed</span>
+    <span class="build-badge">Build {{ build_number }}</span>
   </div>
 
   <!-- CONTENT -->
@@ -1386,6 +1401,9 @@ def create_app(
     """
     app = Flask(__name__)
     app.secret_key = secrets.token_hex(32)
+
+    # Resolve the build number once at startup so every request uses the same value.
+    _build_number = get_build_number()
 
     # Build article lookup map once for O(1) access in route helpers
     _id_to_article: dict[str, dict] = {a["article_id"]: a for a in articles}
@@ -1478,6 +1496,7 @@ def create_app(
             kb_base_url=KB_BASE_URL,
             brave_min_high_conf=BRAVE_MIN_HIGH_CONF,
             brave_available=bool(brave_api_key),
+            build_number=_build_number,
         )
 
     # ------------------------------------------------------------------
@@ -1688,6 +1707,7 @@ def create_app(
             articles=sorted_articles,
             article_count=len(sorted_articles),
             kb_base_url=KB_BASE_URL,
+            build_number=_build_number,
         )
 
     return app

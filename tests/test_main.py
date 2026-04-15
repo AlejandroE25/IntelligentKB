@@ -1338,3 +1338,52 @@ class TestArticlesEndpoint:
             resp = c.get("/articles")
             body = resp.data.decode()
             assert 'href="/"' in body
+
+    def test_build_number_shown_on_articles_page(self, monkeypatch):
+        """The build number must appear in the articles page header."""
+        import main as main_module
+        monkeypatch.setenv("BUILD_NUMBER", "test-build-99")
+        # Rebuild the app so _build_number is re-evaluated with the patched env
+        from main import build_article_index
+        articles = [_make_mock_article("1", title="WiFi Guide")]
+        vectorizer, matrix = build_article_index(articles)
+        client = MagicMock()
+        app = main_module.create_app(client, articles, vectorizer, matrix)
+        app.config["TESTING"] = True
+        with app.test_client() as c:
+            resp = c.get("/articles")
+            body = resp.data.decode()
+        assert "test-build-99" in body
+        assert "Build" in body
+
+
+# ---------------------------------------------------------------------------
+# Build number visible on the main (search) page
+# ---------------------------------------------------------------------------
+
+class TestBuildNumberOnMainPage:
+    def _make_app(self, build_number: str = "build-42"):
+        import main as main_module
+        from main import build_article_index
+        articles = [_make_mock_article()]
+        vectorizer, matrix = build_article_index(articles)
+        client = MagicMock()
+        with patch.object(main_module, "get_build_number", return_value=build_number):
+            app = main_module.create_app(client, articles, vectorizer, matrix)
+        app.config["TESTING"] = True
+        return app
+
+    def test_build_number_shown_on_home_page(self):
+        app = self._make_app("build-42")
+        with app.test_client() as c:
+            resp = c.get("/")
+            body = resp.data.decode()
+        assert "build-42" in body
+        assert "Build" in body
+
+    def test_build_number_shown_after_search(self):
+        app = self._make_app("sha-abc1234")
+        with app.test_client() as c:
+            resp = c.post("/", data={"query": "wifi issue"})
+            body = resp.data.decode()
+        assert "sha-abc1234" in body
