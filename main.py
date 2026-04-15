@@ -20,8 +20,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+import argparse
 import re
 import secrets
+import subprocess
 import sys
 import urllib.error
 import urllib.parse
@@ -1695,7 +1697,46 @@ def create_app(
 # Entry Point
 # ---------------------------------------------------------------------------
 
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run the IntelligentKB web server.")
+    parser.add_argument(
+        "--build-number",
+        action="store_true",
+        help="Print the most recent build number and exit.",
+    )
+    return parser.parse_args()
+
+
+def get_build_number() -> str:
+    """Return a build identifier from CI env vars or the local git commit."""
+    env_build = os.environ.get("BUILD_NUMBER", "").strip()
+    if env_build:
+        return env_build
+
+    github_sha = os.environ.get("GITHUB_SHA", "").strip()
+    if github_sha:
+        return github_sha[:7]
+
+    try:
+        commit_sha = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+        if commit_sha:
+            return commit_sha
+    except (subprocess.SubprocessError, OSError):
+        pass
+
+    return "unknown"
+
+
 def main() -> None:
+    args = _parse_args()
+    if args.build_number:
+        print(get_build_number())
+        return
+
     load_dotenv()
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")

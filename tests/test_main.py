@@ -156,6 +156,59 @@ class TestIsStale:
 
 
 # ---------------------------------------------------------------------------
+# build number / CLI flag
+# ---------------------------------------------------------------------------
+
+class TestBuildNumber:
+    def test_prefers_build_number_env(self, monkeypatch):
+        from main import get_build_number
+
+        monkeypatch.setenv("BUILD_NUMBER", "20260415.7")
+        monkeypatch.setenv("GITHUB_SHA", "abcdef123456")
+        assert get_build_number() == "20260415.7"
+
+    def test_falls_back_to_github_sha(self, monkeypatch):
+        from main import get_build_number
+
+        monkeypatch.delenv("BUILD_NUMBER", raising=False)
+        monkeypatch.setenv("GITHUB_SHA", "abcdef123456")
+        assert get_build_number() == "abcdef1"
+
+    def test_falls_back_to_git_commit(self, monkeypatch):
+        from main import get_build_number
+
+        monkeypatch.delenv("BUILD_NUMBER", raising=False)
+        monkeypatch.delenv("GITHUB_SHA", raising=False)
+        with patch("main.subprocess.check_output", return_value="1a2b3c4\n"):
+            assert get_build_number() == "1a2b3c4"
+
+    def test_returns_unknown_when_commit_unavailable(self, monkeypatch):
+        from main import get_build_number
+
+        monkeypatch.delenv("BUILD_NUMBER", raising=False)
+        monkeypatch.delenv("GITHUB_SHA", raising=False)
+        with patch("main.subprocess.check_output", side_effect=OSError):
+            assert get_build_number() == "unknown"
+
+
+class TestMainBuildNumberFlag:
+    def test_build_number_flag_prints_and_returns_early(self):
+        import main as main_module
+
+        args = type("Args", (), {"build_number": True})()
+        with (
+            patch.object(main_module, "_parse_args", return_value=args),
+            patch.object(main_module, "get_build_number", return_value="build-42"),
+            patch("builtins.print") as mock_print,
+            patch.object(main_module, "load_dotenv") as mock_load_dotenv,
+        ):
+            main_module.main()
+
+        mock_print.assert_called_once_with("build-42")
+        mock_load_dotenv.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # parse_article
 # ---------------------------------------------------------------------------
 
