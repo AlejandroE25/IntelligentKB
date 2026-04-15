@@ -156,6 +156,59 @@ class TestIsStale:
 
 
 # ---------------------------------------------------------------------------
+# build number / CLI flag
+# ---------------------------------------------------------------------------
+
+class TestBuildNumber:
+    def test_prefers_build_number_env(self, monkeypatch):
+        from main import get_build_number
+
+        monkeypatch.setenv("BUILD_NUMBER", "20260415.7")
+        monkeypatch.setenv("GITHUB_SHA", "abcdef123456")
+        assert get_build_number() == "20260415.7"
+
+    def test_falls_back_to_github_sha(self, monkeypatch):
+        from main import get_build_number
+
+        monkeypatch.delenv("BUILD_NUMBER", raising=False)
+        monkeypatch.setenv("GITHUB_SHA", "abcdef123456")
+        assert get_build_number() == "abcdef1"
+
+    def test_falls_back_to_git_commit(self, monkeypatch):
+        from main import get_build_number
+
+        monkeypatch.delenv("BUILD_NUMBER", raising=False)
+        monkeypatch.delenv("GITHUB_SHA", raising=False)
+        with patch("main.subprocess.check_output", return_value="1a2b3c4\n"):
+            assert get_build_number() == "1a2b3c4"
+
+    def test_returns_unknown_when_commit_unavailable(self, monkeypatch):
+        from main import get_build_number
+
+        monkeypatch.delenv("BUILD_NUMBER", raising=False)
+        monkeypatch.delenv("GITHUB_SHA", raising=False)
+        with patch("main.subprocess.check_output", side_effect=OSError):
+            assert get_build_number() == "unknown"
+
+
+class TestMainBuildNumberFlag:
+    def test_build_number_flag_prints_and_returns_early(self):
+        import main as main_module
+
+        args = type("Args", (), {"build_number": True})()
+        with (
+            patch.object(main_module, "_parse_args", return_value=args),
+            patch.object(main_module, "get_build_number", return_value="build-42"),
+            patch("builtins.print") as mock_print,
+            patch.object(main_module, "load_dotenv") as mock_load_dotenv,
+        ):
+            main_module.main()
+
+        mock_print.assert_called_once_with("build-42")
+        mock_load_dotenv.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # parse_article
 # ---------------------------------------------------------------------------
 
@@ -1285,3 +1338,52 @@ class TestArticlesEndpoint:
             resp = c.get("/articles")
             body = resp.data.decode()
             assert 'href="/"' in body
+
+    def test_build_number_shown_on_articles_page(self, monkeypatch):
+        """The build number must appear in the articles page header."""
+        import main as main_module
+        monkeypatch.setenv("BUILD_NUMBER", "test-build-99")
+        # Rebuild the app so _build_number is re-evaluated with the patched env
+        from main import build_article_index
+        articles = [_make_mock_article("1", title="WiFi Guide")]
+        vectorizer, matrix = build_article_index(articles)
+        client = MagicMock()
+        app = main_module.create_app(client, articles, vectorizer, matrix)
+        app.config["TESTING"] = True
+        with app.test_client() as c:
+            resp = c.get("/articles")
+            body = resp.data.decode()
+        assert "test-build-99" in body
+        assert "Build" in body
+
+
+# ---------------------------------------------------------------------------
+# Build number visible on the main (search) page
+# ---------------------------------------------------------------------------
+
+class TestBuildNumberOnMainPage:
+    def _make_app(self, build_number: str = "build-42"):
+        import main as main_module
+        from main import build_article_index
+        articles = [_make_mock_article()]
+        vectorizer, matrix = build_article_index(articles)
+        client = MagicMock()
+        with patch.object(main_module, "get_build_number", return_value=build_number):
+            app = main_module.create_app(client, articles, vectorizer, matrix)
+        app.config["TESTING"] = True
+        return app
+
+    def test_build_number_shown_on_home_page(self):
+        app = self._make_app("build-42")
+        with app.test_client() as c:
+            resp = c.get("/")
+            body = resp.data.decode()
+        assert "build-42" in body
+        assert "Build" in body
+
+    def test_build_number_shown_after_search(self):
+        app = self._make_app("sha-abc1234")
+        with app.test_client() as c:
+            resp = c.post("/", data={"query": "wifi issue"})
+            body = resp.data.decode()
+        assert "sha-abc1234" in body

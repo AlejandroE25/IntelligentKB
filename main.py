@@ -20,8 +20,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+import argparse
 import re
 import secrets
+import subprocess
 import sys
 import urllib.error
 import urllib.parse
@@ -568,6 +570,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       border: 1px solid #444;
     }
     #page-header .nav-link:hover { color: #aaccff; border-color: #7aaee8; }
+    .build-badge {
+      color: #666;
+      font-size: 11px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      margin-left: auto;
+    }
     #search-form {
       display: flex;
       flex: 1;
@@ -846,6 +855,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div id="page-header">
     <h1>KB AI Search</h1>
     <a class="nav-link" href="/articles">Browse Articles</a>
+    <span class="build-badge">Build {{ build_number }}</span>
     <form id="search-form" method="post" action="/">
       <input type="text" id="search-input" name="query"
              value="{{ query | e }}"
@@ -1239,6 +1249,12 @@ ARTICLES_TEMPLATE = """<!DOCTYPE html>
       font-size: 12px;
       margin-left: auto;
     }
+    .build-badge {
+      color: #666;
+      font-size: 11px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
 
     /* ── CONTENT ── */
     #content {
@@ -1313,6 +1329,7 @@ ARTICLES_TEMPLATE = """<!DOCTYPE html>
     <h1>KB AI Search</h1>
     <a class="nav-link" href="/">← Back to Search</a>
     <span class="header-count">{{ article_count }} article{{ 's' if article_count != 1 else '' }} indexed</span>
+    <span class="build-badge">Build {{ build_number }}</span>
   </div>
 
   <!-- CONTENT -->
@@ -1384,6 +1401,9 @@ def create_app(
     """
     app = Flask(__name__)
     app.secret_key = secrets.token_hex(32)
+
+    # Resolve the build number once at startup so every request uses the same value.
+    _build_number = get_build_number()
 
     # Build article lookup map once for O(1) access in route helpers
     _id_to_article: dict[str, dict] = {a["article_id"]: a for a in articles}
@@ -1476,6 +1496,7 @@ def create_app(
             kb_base_url=KB_BASE_URL,
             brave_min_high_conf=BRAVE_MIN_HIGH_CONF,
             brave_available=bool(brave_api_key),
+            build_number=_build_number,
         )
 
     # ------------------------------------------------------------------
@@ -1686,6 +1707,7 @@ def create_app(
             articles=sorted_articles,
             article_count=len(sorted_articles),
             kb_base_url=KB_BASE_URL,
+            build_number=_build_number,
         )
 
     return app
@@ -1695,7 +1717,46 @@ def create_app(
 # Entry Point
 # ---------------------------------------------------------------------------
 
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run the IntelligentKB web server.")
+    parser.add_argument(
+        "--build-number",
+        action="store_true",
+        help="Print the most recent build number and exit.",
+    )
+    return parser.parse_args()
+
+
+def get_build_number() -> str:
+    """Return a build identifier from CI env vars or the local git commit."""
+    env_build = os.environ.get("BUILD_NUMBER", "").strip()
+    if env_build:
+        return env_build
+
+    github_sha = os.environ.get("GITHUB_SHA", "").strip()
+    if github_sha:
+        return github_sha[:7]
+
+    try:
+        commit_sha = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+        if commit_sha:
+            return commit_sha
+    except (subprocess.SubprocessError, OSError):
+        pass
+
+    return "unknown"
+
+
 def main() -> None:
+    args = _parse_args()
+    if args.build_number:
+        print(get_build_number())
+        return
+
     load_dotenv()
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")

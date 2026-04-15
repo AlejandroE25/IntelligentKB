@@ -61,6 +61,12 @@ python main.py
 By default the server listens on **http://127.0.0.1:5000**.  
 Open that URL in your browser to start using the assistant.
 
+To print the current build number (or commit-based fallback) and exit:
+
+```bash
+python main.py --build-number
+```
+
 You can customise the host and port with environment variables:
 
 ```bash
