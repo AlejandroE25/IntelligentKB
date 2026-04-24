@@ -103,8 +103,11 @@ SYSTEM_PROMPT_HEADER = (
     "**Issue:** One sentence identifying the problem.\n"
     "\n"
     "**Steps:**\n"
-    "1. First step. [Article XXXXX](url)\n"
-    "2. Second step. [Article XXXXX](url)\n"
+    "1. [Exact step — copy-paste ready command or precise UI navigation path]. [Article XXXXX](url)\n"
+    "2. [Next step]. [Article XXXXX](url)\n"
+    "\n"
+    "**Source Reliability:** One sentence noting whether sources are current and consistent, "
+    "or flagging any staleness, conflicts, or quality issues.\n"
     "\n"
     "**If Unresolved:** Ask 1-2 targeted clarifying questions before suggesting escalation.\n"
     "\n"
@@ -112,9 +115,14 @@ SYSTEM_PROMPT_HEADER = (
     "- Use only information from the provided KB articles. Do not add general knowledge.\n"
     "- Use plain language, but preserve exact names of systems, tools, buttons, and settings as written in the articles.\n"
     "- Each response is independent; do not assume any prior context.\n"
+    "- Format all troubleshooting steps as a numbered list. Each step must be copy-paste ready: "
+    "use the exact command, exact button name, or exact UI path — not a paraphrase.\n"
     f"- If an article was last updated more than {STALE_ARTICLE_YEARS} years ago, note it inline "
     "(e.g., 'Note: this article was last updated in YYYY - verify these steps are still current.').\n"
-    "- If articles conflict, prefer the more recently updated one and note the discrepancy.\n"
+    "- If an article is marked [QUALITY ALERT], state explicitly before giving steps that you are "
+    "working with potentially unreliable source material.\n"
+    "- When articles conflict, do NOT silently prefer one. Name the conflict explicitly: "
+    "'Note: Articles XXXXX and YYYYY give different instructions. Article XXXXX (more recent) says...'\n"
     "- If the provided articles lack enough information, use the available tools to search for or "
     "fetch additional articles before responding.\n"
     "\n"
@@ -395,7 +403,11 @@ def fetch_brave_results(query: str, api_key: str, count: int = BRAVE_RESULT_COUN
     ]
 
 
-def build_system_prompt(articles: list[dict[str, str]], contacts_text: str = "") -> str:
+def build_system_prompt(
+    articles: list[dict[str, str]],
+    contacts_text: str = "",
+    quality_assessments: dict | None = None,
+) -> str:
     """Construct the full system prompt with all KB article content."""
     lines = [SYSTEM_PROMPT_HEADER, "", "--- KNOWLEDGE BASE ---", ""]
     for article in articles:
@@ -410,6 +422,11 @@ def build_system_prompt(articles: list[dict[str, str]], contacts_text: str = "")
             lines.append(f"Owner: {article['owner']}")
         if article["keywords"]:
             lines.append(f"Keywords: {article['keywords']}")
+        if quality_assessments and article_id:
+            from quality import format_quality_warning
+            warning = format_quality_warning(quality_assessments.get(article_id))
+            if warning:
+                lines.append(warning)
         lines.append("---")
         content = article["content"]
         if len(content) > MAX_ARTICLE_CHARS_IN_PROMPT:
@@ -725,6 +742,37 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       margin-top: 3px;
     }
 
+    /* ── QUALITY BADGES ── */
+    .badge-quality-poor { background: #3a1010; color: #e08080; border: 1px solid #6a2020; font-size: 10px; padding: 0 4px; border-radius: 2px; margin-left: 4px; }
+    .badge-quality-warn { background: #3a2010; color: #e0a060; border: 1px solid #6a4020; font-size: 10px; padding: 0 4px; border-radius: 2px; margin-left: 4px; }
+    .quality-issue-note { color: #c08060; font-size: 10px; font-style: italic; margin-top: 1px; }
+    .btn-flag { background: none; border: none; color: #888; font-size: 10px; cursor: pointer; padding: 2px 0; margin-top: 3px; display: block; }
+    .btn-flag:hover { color: #e08060; }
+    .btn-flag.flagged { color: #e08060; }
+
+    /* ── CONFLICT ALERT ── */
+    .conflict-alert { background: #3a2010; border: 1px solid #6a4020; color: #e0a060; font-size: 12px; padding: 6px 8px; margin-bottom: 8px; }
+
+    /* ── COPY-STEP BUTTONS ── */
+    .step-line { display: block; margin-bottom: 2px; }
+    .btn-copy-step { background: none; border: 1px solid #555; color: #888; font-size: 10px; cursor: pointer; padding: 0 3px; margin-left: 4px; border-radius: 2px; }
+    .btn-copy-step:hover { color: #aaccff; border-color: #7aaee8; }
+
+    /* ── SESSION FEEDBACK ── */
+    #feedback-area {
+      flex-shrink: 0;
+      padding: 4px 8px;
+      border-top: 1px solid #3a3a3a;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .feedback-label { color: #888; font-size: 11px; white-space: nowrap; }
+    .btn-feedback { background: #3a3a3a; border: 1px solid #555; color: #ccc; font-size: 11px; padding: 2px 8px; cursor: pointer; border-radius: 2px; }
+    .btn-feedback:hover { background: #484848; }
+    .btn-feedback.selected { background: #3c5070; border-color: #7aaee8; color: #fff; }
+    .btn-feedback:disabled { opacity: 0.5; cursor: default; }
+
     /* ── RIGHT PANEL ── */
     #right-panel {
       width: 50%;
@@ -896,7 +944,21 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 {% if article.updated %} · Updated: {{ article.updated }}
                   {% if article.updated | is_stale %}<span class="stale-badge">⚠ Last updated {{ article.updated[:4] }}</span>{% endif %}
                 {% endif %}
+                {% if article.article_id and quality_map and article.article_id in quality_map %}
+                  {% set aq = quality_map[article.article_id] %}
+                  {% if aq.overall_score <= 1 %}
+                    <span class="badge-quality-poor">Poor Quality {{ aq.overall_score }}/5</span>
+                  {% elif aq.overall_score <= 3 %}
+                    <span class="badge-quality-warn">Quality Issues {{ aq.overall_score }}/5</span>
+                  {% endif %}
+                {% endif %}
               </div>
+              {% if article.article_id and quality_map and article.article_id in quality_map %}
+                {% set aq = quality_map[article.article_id] %}
+                {% if aq.overall_score <= 3 and aq.issues %}
+                  <div class="quality-issue-note">{{ aq.issues[0] }}</div>
+                {% endif %}
+              {% endif %}
               {% if article.keywords %}
                 <div class="card-keywords">Keywords: {{ article.keywords }}</div>
               {% endif %}
@@ -905,6 +967,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
               {% endif %}
               {% if not in_ai %}
                 <div class="not-in-ai-note">Not included in AI response</div>
+              {% endif %}
+              {% if article.article_id %}
+                <button class="btn-flag{% if flag_counts and article.article_id in flag_counts %} flagged{% endif %}"
+                        data-article-id="{{ article.article_id | e }}">
+                  🚩 Flag ({{ (flag_counts or {}).get(article.article_id, 0) }})
+                </button>
               {% endif %}
             </div>
           {% endfor %}
@@ -951,6 +1019,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           </form>
         </div>
 
+      {% if ai_response and not ai_error %}
+        <div id="feedback-area">
+      {% else %}
+        <div id="feedback-area" style="display:none">
+      {% endif %}
+          <span class="feedback-label">Did this resolve the issue?</span>
+          <button class="btn-feedback" data-outcome="yes" data-query="{{ query | e }}">Yes</button>
+          <button class="btn-feedback" data-outcome="partial" data-query="{{ query | e }}">Partial</button>
+          <button class="btn-feedback" data-outcome="no" data-query="{{ query | e }}">No</button>
+        </div>
+
     </div>
 
   </div>
@@ -971,18 +1050,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       const staleHtml = a.is_stale
         ? ` <span class="stale-badge">⚠ Last updated ${esc(String(a.updated).slice(0, 4))}</span>`
         : '';
+      let qualityHtml = '';
+      if (a.quality_score != null && a.quality_score <= 3) {
+        const cls = a.quality_score <= 1 ? 'badge-quality-poor' : 'badge-quality-warn';
+        qualityHtml = ` <span class="${cls}">${a.quality_score <= 1 ? 'Poor Quality' : 'Quality Issues'} ${a.quality_score}/5</span>`;
+      }
+      const issueHtml = (a.quality_issues && a.quality_issues.length > 0 && a.quality_score <= 3)
+        ? `<div class="quality-issue-note">${esc(a.quality_issues[0])}</div>` : '';
       const metaHtml = [
         a.owner ? esc(a.owner) : '',
         a.updated ? ` · Updated: ${esc(a.updated)}${staleHtml}` : '',
+        qualityHtml,
       ].join('');
       const kwHtml = a.keywords
         ? `<div class="card-keywords">Keywords: ${esc(a.keywords)}</div>` : '';
       const exHtml = a.excerpt
         ? `<div class="card-excerpt">${esc(a.excerpt)}${a.excerpt_truncated ? '…' : ''}</div>` : '';
       const noteHtml = a.in_ai ? '' : '<div class="not-in-ai-note">Not included in AI response</div>';
+      const flagCount = a.flag_count || 0;
+      const flagHtml = a.article_id
+        ? `<button class="btn-flag${flagCount > 0 ? ' flagged' : ''}" data-article-id="${esc(a.article_id)}">🚩 Flag (${flagCount})</button>`
+        : '';
       return `<div class="result-card${notInAiClass}">
   <div class="card-title-row">${titleHtml}<span class="card-id">#${esc(a.article_id)}</span><span class="relevancy-badge ${esc(a.badge_class)}">${esc(a.badge_label)}</span></div>
-  <div class="card-meta">${metaHtml}</div>${kwHtml}${exHtml}${noteHtml}
+  <div class="card-meta">${metaHtml}</div>${issueHtml}${kwHtml}${exHtml}${noteHtml}${flagHtml}
 </div>`;
     }
 
@@ -1095,23 +1186,59 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     });
 
     // ── Async AI response ─────────────────────────────────────────────────────
+    const feedbackArea = document.getElementById('feedback-area');
+
     function showAiLoading() {
       aiContent.innerHTML = '<p class="empty-state" style="color:#888;font-style:italic">Generating troubleshooting steps\u2026</p>';
-      if (refineArea) refineArea.style.display = 'none';
+      if (refineArea)   refineArea.style.display = 'none';
+      if (feedbackArea) feedbackArea.style.display = 'none';
+    }
+
+    function addCopyButtons(container) {
+      const body = container.querySelector('#ai-body');
+      if (!body) return;
+      body.innerHTML = body.innerHTML.replace(
+        /^(\d+\.\s[^\n]+)$/gm,
+        (line) => `<span class="step-line">${line} <button class="btn-copy-step" title="Copy step">\u2398</button></span>`
+      );
+      body.addEventListener('click', function(e) {
+        const btn = e.target.closest('.btn-copy-step');
+        if (!btn) return;
+        const stepText = btn.parentElement.textContent.replace('\u2398', '').trim();
+        navigator.clipboard.writeText(stepText).then(() => {
+          btn.textContent = '\u2713';
+          setTimeout(() => btn.textContent = '\u2398', 1500);
+        });
+      });
     }
 
     function showAiResult(data, query) {
       if (data.error) {
         aiContent.innerHTML = `<div id="ai-body" class="ai-error">${esc(data.error)}</div>`;
+        if (feedbackArea) feedbackArea.style.display = 'none';
       } else if (data.response) {
-        let html = `<div id="ai-body">${esc(data.response)}</div>`;
+        let conflictHtml = '';
+        if (data.conflicts && data.conflicts.length > 0) {
+          conflictHtml = '<div class="conflict-alert">\u26a0 Note: The source articles for this response contain conflicting guidance. Verify steps directly with the relevant team before advising the client.</div>';
+        }
+        let html = `${conflictHtml}<div id="ai-body">${esc(data.response)}</div>`;
         if (data.footer) html += `<div id="ai-footer">${esc(data.footer)}</div>`;
         aiContent.innerHTML = html;
+        addCopyButtons(aiContent);
         if (refineQueryIn) refineQueryIn.value = query;
         if (refineInput)   refineInput.value   = '';
         if (refineArea)    refineArea.style.display = '';
+        if (feedbackArea) {
+          feedbackArea.style.display = '';
+          feedbackArea.querySelectorAll('.btn-feedback').forEach(b => {
+            b.classList.remove('selected');
+            b.disabled = false;
+            b.dataset.query = query;
+          });
+        }
       } else {
         aiContent.innerHTML = '<p class="empty-state">No response received.</p>';
+        if (feedbackArea) feedbackArea.style.display = 'none';
       }
       // Sync brave-section visibility using server-computed article confidence.
       // This ensures brave shows/hides correctly even when doSearch was skipped.
@@ -1176,6 +1303,47 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         if (!origQuery) return;
         if (aiInFlight) return;
         doAi(origQuery, refinement);
+      });
+    }
+
+    // ── Article flagging ──────────────────────────────────────────────────────
+    document.addEventListener('click', async function(e) {
+      const btn = e.target.closest('.btn-flag');
+      if (!btn) return;
+      const articleId = btn.dataset.articleId;
+      if (!articleId) return;
+      const reason = prompt('Why are you flagging this article? (e.g. "Steps are wrong", "Outdated")');
+      if (!reason) return;
+      btn.disabled = true;
+      try {
+        const body = new FormData();
+        body.append('article_id', articleId);
+        body.append('reason', reason);
+        const resp = await fetch('/flag', { method: 'POST', body });
+        const data = await resp.json();
+        if (data.ok) {
+          btn.textContent = `🚩 Flag (${data.flag_count})`;
+          btn.classList.add('flagged');
+        }
+      } catch(_) {}
+      btn.disabled = false;
+    });
+
+    // ── Session feedback ──────────────────────────────────────────────────────
+    if (feedbackArea) {
+      feedbackArea.addEventListener('click', async function(e) {
+        const btn = e.target.closest('.btn-feedback');
+        if (!btn || btn.disabled) return;
+        const outcome = btn.dataset.outcome;
+        const query = btn.dataset.query || lastSearchQuery;
+        feedbackArea.querySelectorAll('.btn-feedback').forEach(b => b.disabled = true);
+        btn.classList.add('selected');
+        try {
+          const body = new FormData();
+          body.append('outcome', outcome);
+          body.append('query', query);
+          await fetch('/feedback', { method: 'POST', body });
+        } catch(_) {}
       });
     }
 
@@ -1378,6 +1546,136 @@ ARTICLES_TEMPLATE = """<!DOCTYPE html>
 """
 
 
+ADMIN_TEMPLATE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin: Article Quality – KB AI Search</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 13px; background: #262626; color: #cccccc; margin: 0; padding: 0; }
+    #page-header { background: #262626; padding: 8px 12px; border-bottom: 2px solid #555; display: flex; align-items: center; gap: 10px; }
+    #page-header h1 { font-size: 15px; font-weight: bold; font-style: italic; color: #7aaee8; margin: 0; }
+    .nav-link { color: #7aaee8; font-size: 12px; text-decoration: none; padding: 4px 6px; border: 1px solid #444; }
+    .nav-link:hover { color: #aaccff; border-color: #7aaee8; }
+    .build-badge { color: #666; font-size: 11px; margin-left: auto; }
+    #content { padding: 12px 16px; }
+    .summary-grid { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+    .summary-card { background: #2e2e2e; border: 1px solid #444; padding: 8px 12px; min-width: 120px; }
+    .summary-card .label { color: #888; font-size: 11px; }
+    .summary-card .value { font-size: 18px; font-weight: bold; color: #7aaee8; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { background: #3c5070; color: #fff; font-size: 12px; font-weight: bold; padding: 5px 8px; text-align: left; }
+    tbody tr:nth-child(even) { background: #2a2a2a; }
+    tbody tr:hover { background: #303040; }
+    td { padding: 5px 8px; border-bottom: 1px solid #3a3a3a; vertical-align: top; font-size: 12px; }
+    .article-link { color: #7aaee8; text-decoration: none; }
+    .article-link:hover { color: #aaccff; text-decoration: underline; }
+    .score-5 { color: #6ec86e; font-weight: bold; }
+    .score-4 { color: #a0c070; }
+    .score-3 { color: #c8b050; }
+    .score-2 { color: #e0a060; font-weight: bold; }
+    .score-1 { color: #e08080; font-weight: bold; }
+    .score-na { color: #666; }
+    .flag-count { color: #e08060; font-weight: bold; }
+    .issues-cell { color: #c08060; font-size: 11px; }
+    .conflicts-cell { color: #e0a060; font-size: 11px; }
+    .stale-badge { background: #3a2a10; color: #c89040; border: 1px solid #6a4a20; font-size: 10px; padding: 0 4px; }
+    .warn-note { background: #3a2010; border: 1px solid #6a4020; color: #e0a060; font-size: 11px; padding: 4px 8px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div id="page-header">
+    <h1>KB AI Search</h1>
+    <a class="nav-link" href="/">← Back to Search</a>
+    <a class="nav-link" href="/articles">Browse Articles</a>
+    <span class="build-badge">Build {{ build_number }}</span>
+  </div>
+  <div id="content">
+    <p class="warn-note">⚠ Admin dashboard — unauthenticated. Do not expose publicly without adding authentication.</p>
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="label">Articles</div>
+        <div class="value">{{ total_articles }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Assessed</div>
+        <div class="value">{{ assessed_articles }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Total Flags</div>
+        <div class="value">{{ summary.total_flags }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Resolved</div>
+        <div class="value" title="Sessions marked Yes / Partial / No">{{ summary.session_feedback_counts.yes }} / {{ summary.session_feedback_counts.partial }} / {{ summary.session_feedback_counts.no }}</div>
+      </div>
+    </div>
+
+    {% if summary.most_flagged %}
+    <p style="color:#888;font-size:11px;margin:0 0 4px 0">Most flagged: {% for aid, cnt in summary.most_flagged %}<strong style="color:#e08060">{{ aid }}</strong> ({{ cnt }}){% if not loop.last %}, {% endif %}{% endfor %}</p>
+    {% endif %}
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width:30%">Title</th>
+          <th style="width:8%">ID</th>
+          <th style="width:7%">Score</th>
+          <th style="width:5%">Flags</th>
+          <th style="width:35%">Issues</th>
+          <th style="width:15%">Conflicts</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for article, aq, flag_count in rows %}
+        <tr>
+          <td>
+            {% if article.article_id %}
+              <a class="article-link" href="{{ kb_base_url }}/{{ article.article_id }}" target="_blank">{{ article.title }}</a>
+            {% else %}
+              {{ article.title }}
+            {% endif %}
+            {% if article.updated and article.updated | is_stale %}
+              <span class="stale-badge">⚠ {{ article.updated[:4] }}</span>
+            {% endif %}
+          </td>
+          <td style="color:#777;font-size:11px">{{ article.article_id or '—' }}</td>
+          <td>
+            {% if aq %}
+              <span class="score-{{ aq.overall_score }}">{{ aq.overall_score }}/5</span>
+            {% else %}
+              <span class="score-na">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if flag_count > 0 %}
+              <span class="flag-count">{{ flag_count }}</span>
+            {% else %}
+              0
+            {% endif %}
+          </td>
+          <td class="issues-cell">
+            {% if aq and aq.issues %}
+              {% for issue in aq.issues[:3] %}{{ issue }}{% if not loop.last %}; {% endif %}{% endfor %}
+            {% endif %}
+          </td>
+          <td class="conflicts-cell">
+            {% if aq and aq.conflict_ids %}
+              {{ aq.conflict_ids | join(', ') }}
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>
+"""
+
+
 def create_app(
     client: anthropic.Anthropic,
     articles: list[dict[str, str]],
@@ -1386,6 +1684,8 @@ def create_app(
     contacts_text: str = "",
     retriever: Optional["HybridRetriever"] = None,  # type: ignore[name-defined]
     brave_api_key: str = "",
+    feedback_store=None,
+    quality_assessments: dict | None = None,
 ) -> Flask:
     """Create and configure the Flask application.
 
@@ -1481,6 +1781,7 @@ def create_app(
         ai_error: str = "",
     ):
         display_scores = [score for _, score in display_articles] if display_articles else []
+        _flag_counts = feedback_store.get_flag_counts() if feedback_store else {}
         return render_template_string(
             HTML_TEMPLATE,
             query=query,
@@ -1497,6 +1798,8 @@ def create_app(
             brave_min_high_conf=BRAVE_MIN_HIGH_CONF,
             brave_available=bool(brave_api_key),
             build_number=_build_number,
+            quality_map=quality_assessments or {},
+            flag_counts=_flag_counts,
         )
 
     # ------------------------------------------------------------------
@@ -1546,12 +1849,31 @@ def create_app(
 
     # ------------------------------------------------------------------
 
+    def _detect_conflicts(top_articles: list[dict[str, str]]) -> list[tuple[str, str]]:
+        """Return (article_id_a, article_id_b) pairs that conflict among top_articles."""
+        if not quality_assessments:
+            return []
+        ids = {a["article_id"] for a in top_articles if a.get("article_id")}
+        seen: list[tuple[str, str]] = []
+        for article in top_articles:
+            aid = article.get("article_id", "")
+            if not aid:
+                continue
+            aq = quality_assessments.get(aid)
+            if aq and aq.conflict_ids:
+                for cid in aq.conflict_ids:
+                    if cid in ids and cid != aid:
+                        pair = tuple(sorted([aid, cid]))
+                        if pair not in seen:
+                            seen.append(pair)
+        return seen
+
     def _run_claude(query: str, top_articles: list[dict[str, str]]) -> tuple[str | None, str, str]:
         """Run Claude for the given query and top articles.
 
         Returns ``(ai_response, ai_footer, ai_error)``.
         """
-        system_prompt = build_system_prompt(top_articles, contacts_text)
+        system_prompt = build_system_prompt(top_articles, contacts_text, quality_assessments)
         messages = [{"role": "user", "content": query}]
         ai_response = None
         ai_footer = ""
@@ -1635,11 +1957,14 @@ def create_app(
 
         display = _get_display_articles(q)
         display_scores = [score for _, score in display]
+        _flag_counts = feedback_store.get_flag_counts() if feedback_store else {}
         result = []
         for i, (article, score) in enumerate(display):
             badge_label, badge_class = _classify_relevance_badge(score, i, display_scores, q, article)
+            aid = article["article_id"]
+            aq = (quality_assessments or {}).get(aid)
             result.append({
-                "article_id": article["article_id"],
+                "article_id": aid,
                 "title": article["title"],
                 "owner": article.get("owner", ""),
                 "updated": article.get("updated", ""),
@@ -1650,7 +1975,10 @@ def create_app(
                 "badge_label": badge_label,
                 "badge_class": badge_class,
                 "in_ai": i < TOP_K_ARTICLES,
-                "url": f"{KB_BASE_URL}/{article['article_id']}" if article["article_id"] else "",
+                "url": f"{KB_BASE_URL}/{aid}" if aid else "",
+                "quality_score": aq.overall_score if aq else None,
+                "quality_issues": aq.issues[:1] if aq else [],
+                "flag_count": _flag_counts.get(aid, 0),
             })
 
         resp = jsonify({"articles": result, "count": len(result)})
@@ -1695,8 +2023,21 @@ def create_app(
             if _classify_relevance_badge(score, i, display_scores, query, article)[0] == "High"
         )
         top_articles = _get_top_articles_for_claude(display)
+        conflicts = _detect_conflicts(top_articles)
+        has_quality_issues = any(
+            (quality_assessments or {}).get(a["article_id"]) is not None
+            and (quality_assessments or {})[a["article_id"]].overall_score <= 3
+            for a in top_articles if a.get("article_id")
+        )
         ai_response, ai_footer, ai_error = _run_claude(combined, top_articles)
-        return jsonify({"response": ai_response, "footer": ai_footer, "error": ai_error, "high_conf_count": high_conf_count})
+        return jsonify({
+            "response": ai_response,
+            "footer": ai_footer,
+            "error": ai_error,
+            "high_conf_count": high_conf_count,
+            "conflicts": [list(pair) for pair in conflicts],
+            "has_quality_issues": has_quality_issues,
+        })
 
     @app.route("/articles")
     def articles_index():
@@ -1709,6 +2050,88 @@ def create_app(
             kb_base_url=KB_BASE_URL,
             build_number=_build_number,
         )
+
+    @app.route("/flag", methods=["POST"])
+    def flag_article():
+        """Record a consultant flag on an article."""
+        if feedback_store is None:
+            return jsonify({"ok": False, "error": "Feedback store not configured."}), 503
+        article_id = request.form.get("article_id", "").strip()
+        reason = request.form.get("reason", "").strip()
+        if not article_id:
+            return jsonify({"ok": False, "error": "Missing article_id"}), 400
+        if article_id not in _id_to_article:
+            return jsonify({"ok": False, "error": "Unknown article"}), 404
+        session_id = request.cookies.get("session_id", secrets.token_hex(8))
+        record = feedback_store.add_article_flag(article_id, reason, session_id)
+        return jsonify({"ok": True, "flag_count": record["flag_count"]})
+
+    @app.route("/feedback", methods=["POST"])
+    def session_feedback():
+        """Record whether the AI response resolved the client's issue."""
+        if feedback_store is None:
+            return jsonify({"ok": False, "error": "Feedback store not configured."}), 503
+        outcome = request.form.get("outcome", "").strip()
+        query = request.form.get("query", "").strip()
+        if outcome not in ("yes", "no", "partial"):
+            return jsonify({"ok": False, "error": "Invalid outcome"}), 400
+        session_id = request.cookies.get("session_id", secrets.token_hex(8))
+        feedback_store.add_session_feedback(session_id, query, outcome)
+        return jsonify({"ok": True})
+
+    @app.route("/admin/quality")
+    def admin_quality():
+        """Admin dashboard showing article quality scores, flags, and feedback summary."""
+        rows = []
+        for article in sorted(articles, key=lambda a: a.get("title", "").lower()):
+            aid = article.get("article_id", "")
+            aq = (quality_assessments or {}).get(aid)
+            flag_count = (feedback_store.get_flag_counts().get(aid, 0) if feedback_store else 0)
+            rows.append((article, aq, flag_count))
+        rows.sort(key=lambda r: (r[1].overall_score if r[1] else 6))
+        summary = feedback_store.get_summary() if feedback_store else {
+            "total_flags": 0, "flagged_articles": 0,
+            "session_feedback_counts": {"yes": 0, "no": 0, "partial": 0},
+            "most_flagged": [],
+        }
+        assessed = sum(1 for _, aq, _ in rows if aq is not None)
+        return render_template_string(
+            ADMIN_TEMPLATE,
+            rows=rows,
+            summary=summary,
+            build_number=_build_number,
+            kb_base_url=KB_BASE_URL,
+            total_articles=len(articles),
+            assessed_articles=assessed,
+        )
+
+    @app.route("/admin/sync-articles", methods=["POST"])
+    def admin_sync_articles():
+        """Re-download articles from Azure Blob Storage without restarting the app."""
+        import time as _time
+        import tempfile
+        blob_service = app.config.get("BLOB_SERVICE")
+        articles_container = app.config.get("ARTICLES_CONTAINER", "")
+        if not blob_service or not articles_container:
+            return jsonify({"ok": False, "error": "Azure Blob Storage not configured."}), 503
+        t0 = _time.time()
+        try:
+            from blob_store import download_articles_from_blob
+            tmp_dir = Path(tempfile.mkdtemp(prefix="kb_articles_sync_"))
+            count = download_articles_from_blob(articles_container, tmp_dir, blob_service)
+            new_articles, new_contacts = load_articles(tmp_dir)
+            if not new_articles:
+                return jsonify({"ok": False, "error": "No articles found in blob container."}), 400
+            # Update app state in place
+            articles.clear()
+            articles.extend(new_articles)
+            _id_to_article.clear()
+            _id_to_article.update({a["article_id"]: a for a in new_articles})
+            duration_ms = int((_time.time() - t0) * 1000)
+            return jsonify({"ok": True, "article_count": len(new_articles), "duration_ms": duration_ms})
+        except Exception as exc:
+            logger.error("Sync articles failed: %s", exc)
+            return jsonify({"ok": False, "error": str(exc)}), 500
 
     return app
 
@@ -1809,7 +2232,63 @@ def main() -> None:
     brave_api_key = os.environ.get("BRAVE_API_KEY", "")
     if brave_api_key:
         print("Brave Search integration enabled.")
-    app = create_app(client, articles, vectorizer, doc_matrix, contacts_text, retriever, brave_api_key)
+
+    # Azure Blob Storage — optional; degrades gracefully if not configured
+    from blob_store import get_blob_service_client, download_articles_from_blob
+    from feedback_store import FeedbackStore
+    from quality import build_quality_cache
+
+    blob_service = get_blob_service_client()
+    articles_container = os.environ.get("AZURE_STORAGE_ARTICLES_CONTAINER", "")
+    data_container = os.environ.get("AZURE_STORAGE_DATA_CONTAINER", "")
+
+    if blob_service and articles_container:
+        import tempfile
+        tmp_dir = Path(tempfile.mkdtemp(prefix="kb_articles_"))
+        try:
+            count = download_articles_from_blob(articles_container, tmp_dir, blob_service)
+            if count > 0:
+                blob_articles, blob_contacts = load_articles(tmp_dir)
+                if blob_articles:
+                    articles = blob_articles
+                    contacts_text = blob_contacts
+                    # Rebuild index with blob articles
+                    vectorizer, doc_matrix = build_article_index(articles)
+                    if retriever is not None:
+                        retriever.build(articles, vectorizer, doc_matrix)
+                    print(f"Loaded {len(articles)} article(s) from Azure Blob Storage.")
+        except Exception as exc:
+            print(f"Warning: Could not load articles from blob storage: {exc}", file=sys.stderr)
+
+    feedback_path = Path(__file__).parent / "feedback.json"
+    quality_cache_path = Path(__file__).parent / "quality_cache.json"
+
+    feedback_store = FeedbackStore(feedback_path, blob_service=blob_service, data_container_name=data_container)
+    if blob_service and data_container:
+        feedback_store.load_from_blob(blob_service, data_container)
+
+    quality_assessments: dict = {}
+    if not os.environ.get("SKIP_QUALITY_ASSESSMENT"):
+        print("Running article quality assessment (set SKIP_QUALITY_ASSESSMENT=1 to skip)...")
+        quality_assessments = build_quality_cache(
+            client, articles, quality_cache_path,
+            stale_years=STALE_ARTICLE_YEARS,
+            blob_service=blob_service,
+            data_container_name=data_container,
+        )
+        poor = sum(1 for aq in quality_assessments.values() if aq.overall_score <= 2)
+        print(f"Quality assessment complete: {len(quality_assessments)} articles assessed, {poor} with score ≤2.")
+    else:
+        print("Quality assessment skipped (SKIP_QUALITY_ASSESSMENT=1).")
+
+    app = create_app(
+        client, articles, vectorizer, doc_matrix, contacts_text, retriever, brave_api_key,
+        feedback_store=feedback_store,
+        quality_assessments=quality_assessments,
+    )
+    if blob_service:
+        app.config["BLOB_SERVICE"] = blob_service
+        app.config["ARTICLES_CONTAINER"] = articles_container
 
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "5000"))

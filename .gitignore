@@ -28,3 +28,9 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+# Runtime data (persisted to Azure Blob Storage; local copies are transient)
+feedback.json
+feedback.json.tmp
+quality_cache.json
+quality_cache.json.tmp
