@@ -24,7 +24,11 @@ if _SEARCH_ENHANCEMENT_AVAILABLE:
 client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 brave_api_key = os.environ.get("BRAVE_API_KEY", "")
 
-from blob_store import get_blob_service_client, download_articles_from_blob
+from blob_store import (
+    get_blob_service_client,
+    download_articles_from_blob,
+    download_parsed_articles_from_blob,
+)
 from feedback_store import FeedbackStore
 from quality import build_quality_cache
 
@@ -33,17 +37,25 @@ articles_container = os.environ.get("AZURE_STORAGE_ARTICLES_CONTAINER", "")
 data_container = os.environ.get("AZURE_STORAGE_DATA_CONTAINER", "")
 
 if blob_service and articles_container:
-    tmp_dir = Path(tempfile.mkdtemp(prefix="kb_articles_"))
     try:
-        count = download_articles_from_blob(articles_container, tmp_dir, blob_service)
-        if count > 0:
-            blob_articles, blob_contacts = load_articles(tmp_dir)
-            if blob_articles:
-                articles = blob_articles
-                contacts_text = blob_contacts
-                vectorizer, doc_matrix = build_article_index(articles)
-                if retriever is not None:
-                    retriever.build(articles, vectorizer, doc_matrix)
+        result = download_parsed_articles_from_blob(articles_container, blob_service)
+        if result:
+            articles, contacts_text = result
+            vectorizer, doc_matrix = build_article_index(articles)
+            if retriever is not None:
+                retriever.build(articles, vectorizer, doc_matrix)
+        else:
+            # Fall back to raw HTML blobs
+            tmp_dir = Path(tempfile.mkdtemp(prefix="kb_articles_"))
+            count = download_articles_from_blob(articles_container, tmp_dir, blob_service)
+            if count > 0:
+                blob_articles, blob_contacts = load_articles(tmp_dir)
+                if blob_articles:
+                    articles = blob_articles
+                    contacts_text = blob_contacts
+                    vectorizer, doc_matrix = build_article_index(articles)
+                    if retriever is not None:
+                        retriever.build(articles, vectorizer, doc_matrix)
     except Exception:
         pass  # Fall back to local articles on any blob error
 
