@@ -1,5 +1,5 @@
 """
-KB AI Search Agent
+iKB Search Agent
 ==================
 A locally-run web app where a help desk consultant describes a support problem
 in plain English and receives relevant troubleshooting steps drawn from local KB
@@ -222,6 +222,10 @@ def parse_article(path: Path) -> dict[str, str]:
         kw_span = soup.find("span", id="kb-page-keywords")
         if kw_span:
             keywords = kw_span.get_text(strip=True)
+    # Strip the "Suggest keywords / We appreciate your suggestion" UI text that
+    # bleeds into the doc-attr-value in many articles.
+    if keywords and "Suggest keywords" in keywords:
+        keywords = keywords[:keywords.index("Suggest keywords")].strip().rstrip(",")
 
     # 2. Strip noise elements
     for tag in soup.find_all(["script", "style", "header", "footer", "nav", "aside"]):
@@ -319,27 +323,110 @@ def load_articles(articles_dir: Path) -> tuple[list[dict[str, str]], str]:
 # TF-IDF Article Index
 # ---------------------------------------------------------------------------
 
+_TITLE_CONCEPT_SYNONYMS: dict[str, str] = {
+    "troubleshooting": "not working broken error problem fix resolve",
+    "installation":    "install configure download",
+    "enrollment":      "setup configure activate register add enroll",
+    "getting connected": "connect join",
+    "obtaining":       "get request retrieve",
+    "device management": "device phone add remove change update",
+    "logging in":      "login sign access",
+}
+
+
 def build_article_index(
     articles: list[dict[str, str]],
 ) -> tuple[TfidfVectorizer, np.ndarray]:
-    """Build a TF-IDF index over all KB articles.
+    """Build a weighted multi-field TF-IDF index over all KB articles.
 
-    Each article is represented by its title, keywords, and content combined
-    so that all three fields contribute to relevance scoring.
+    Uses per-field L2 normalization so that keyword length cannot create a
+    density advantage (a short dense keyword list does not beat a long diverse
+    one).  Fields are combined with explicit weights: title (0.45), keywords
+    (0.35), content (0.20).
 
-    Returns a ``(vectorizer, doc_matrix)`` tuple.  The document matrix is
-    pre-computed here so it does not need to be recomputed on every query.
+    Title entries include concept-synonym injections so queries like "not
+    working" or "how do I set up" match titles like "Troubleshooting" or
+    "Enrollment" even though those exact words don't appear in the query.
+
+    Returns a ``(vectorizer, doc_matrix)`` tuple; the doc_matrix is the
+    weighted sum of the per-field matrices and is ready for cosine_similarity.
     """
-    corpus = []
-    for a in articles:
-        # Repeat title and keywords to boost their TF-IDF weight relative to body text.
-        # sublinear_tf dampens but does not eliminate the boost (log(1+3)/log(1+1) ≈ 2×).
-        title = a["title"]
-        kw = a["keywords"]
-        corpus.append(f"{title} {title} {title} {kw} {kw} {kw} {a['content']}")
+    # 1. Fit a shared vocabulary on the combined text of all fields so that IDF
+    #    reflects true corpus-wide term rarity across all fields.
+    combined = [
+        f"{a['title']} {a['keywords']} {a['content']}"
+        for a in articles
+    ]
     vectorizer = TfidfVectorizer(stop_words="english", sublinear_tf=True)
-    doc_matrix = vectorizer.fit_transform(corpus)
+    vectorizer.fit(combined)
+
+    # 2. Build per-field corpora.
+    title_corpus, kw_corpus, content_corpus = [], [], []
+    for a in articles:
+        title_lower = a["title"].lower()
+        concept_extras = " ".join(
+            synonyms
+            for concept, synonyms in _TITLE_CONCEPT_SYNONYMS.items()
+            if concept in title_lower
+        )
+        title_corpus.append(f"{a['title']} {concept_extras}")
+        kw_corpus.append(a["keywords"])
+        content_corpus.append(a["content"])
+
+    # 3. Transform each field with the shared vectorizer (applies shared IDF,
+    #    then L2-normalises each document vector within that field independently).
+    title_mat   = vectorizer.transform(title_corpus)
+    kw_mat      = vectorizer.transform(kw_corpus)
+    content_mat = vectorizer.transform(content_corpus)
+
+    # 4. Weighted sum.  Per-field normalisation means keyword length can no
+    #    longer inflate one article's term weights relative to another's.
+    doc_matrix = 0.45 * title_mat + 0.35 * kw_mat + 0.20 * content_mat
     return vectorizer, doc_matrix
+
+
+# ---------------------------------------------------------------------------
+# Query expansion: phrases/tokens → additional search terms appended to query.
+# Applied unconditionally before TF-IDF so that natural-language problem
+# descriptions ("not working", "can't connect") map onto the vocabulary used
+# in article titles and keywords ("troubleshooting", "connectivity").
+# ---------------------------------------------------------------------------
+_QUERY_EXPANSIONS: list[tuple[str, str]] = [
+    # Problem descriptions → "troubleshooting" only (avoid generic "problem"/"issue"
+    # which appear in many article keywords and dilute discrimination).
+    ("not working",     "troubleshooting"),
+    ("doesn't work",    "troubleshooting"),
+    ("doesnt work",     "troubleshooting"),
+    ("wont work",       "troubleshooting"),
+    ("broken",          "troubleshooting"),
+    ("stopped working", "troubleshooting"),
+    ("not responding",  "troubleshooting"),
+    ("not showing",     "troubleshooting"),
+    ("not receiving",   "troubleshooting"),
+    ("not getting",     "troubleshooting"),
+    # Connectivity
+    ("cant connect",    "troubleshooting connectivity"),
+    ("can't connect",   "troubleshooting connectivity"),
+    ("no internet",     "wifi wireless connectivity troubleshooting"),
+    # Auth / login problems
+    ("cant login",      "troubleshooting login reset password"),
+    ("can't login",     "troubleshooting login reset password"),
+    ("cant log in",     "troubleshooting login reset password"),
+    ("can't log in",    "troubleshooting login reset password"),
+    ("locked out",      "troubleshooting login reset password"),
+    ("forgot",          "reset recover lost"),
+    ("set up",          "setup"),
+]
+
+
+def _expand_query(query: str) -> str:
+    """Append expansion terms for any matching phrases/tokens in *query*."""
+    lower = query.lower()
+    extras: list[str] = []
+    for phrase, expansion in _QUERY_EXPANSIONS:
+        if phrase in lower:
+            extras.append(expansion)
+    return f"{query} {' '.join(extras)}" if extras else query
 
 
 def select_relevant_articles(
@@ -354,7 +441,7 @@ def select_relevant_articles(
     Falls back to returning all articles if the query produces an all-zero
     vector (e.g. it contains only stop-words not present in the corpus).
     """
-    query_vec = vectorizer.transform([query])
+    query_vec = vectorizer.transform([_expand_query(query)])
 
     scores = cosine_similarity(query_vec, doc_matrix).flatten()
 
@@ -379,7 +466,7 @@ def select_display_articles(
     Falls back to all articles (with score 0.0) when the query produces an
     all-zero vector (e.g. only stop-words).
     """
-    query_vec = vectorizer.transform([query])
+    query_vec = vectorizer.transform([_expand_query(query)])
     scores = cosine_similarity(query_vec, doc_matrix).flatten()
 
     if not np.any(scores):
@@ -560,7 +647,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KB AI Search</title>
+  <title>iKB Search</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     body {
@@ -933,7 +1020,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <body>
   <!-- HEADER -->
   <div id="page-header">
-    <h1>KB AI Search</h1>
+    <h1>iKB Search</h1>
     <a class="nav-link" href="/articles">Browse Articles</a>
     <span class="build-badge">Build {{ build_number }}</span>
     <form id="search-form" method="post" action="/">
@@ -1412,7 +1499,7 @@ ARTICLES_TEMPLATE = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KB Articles – KB AI Search</title>
+  <title>KB Articles – iKB Search</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     body {
@@ -1538,7 +1625,7 @@ ARTICLES_TEMPLATE = """<!DOCTYPE html>
 <body>
   <!-- HEADER -->
   <div id="page-header">
-    <h1>KB AI Search</h1>
+    <h1>iKB Search</h1>
     <a class="nav-link" href="/">← Back to Search</a>
     <span class="header-count">{{ article_count }} article{{ 's' if article_count != 1 else '' }} indexed</span>
     <span class="build-badge">Build {{ build_number }}</span>
@@ -1595,7 +1682,7 @@ ADMIN_TEMPLATE = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin: Article Quality – KB AI Search</title>
+  <title>Admin: Article Quality – iKB Search</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 13px; background: #262626; color: #cccccc; margin: 0; padding: 0; }
@@ -1631,7 +1718,7 @@ ADMIN_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body>
   <div id="page-header">
-    <h1>KB AI Search</h1>
+    <h1>iKB Search</h1>
     <a class="nav-link" href="/">← Back to Search</a>
     <a class="nav-link" href="/articles">Browse Articles</a>
     <span class="build-badge">Build {{ build_number }}</span>
