@@ -213,48 +213,63 @@ def parse_article(path: Path) -> dict[str, str]:
     html = path.read_text(encoding="utf-8", errors="replace")
     soup = BeautifulSoup(html, "html.parser")
 
-    # 1. Extract metadata from doc-attr BEFORE stripping it
+    # 1. Extract ALL metadata from doc-attr elements BEFORE stripping them.
+    #    Keywords live inside a doc-attr div and will be lost if we strip first.
     updated = _extract_doc_attr(soup, "updated")
     owner = _extract_doc_attr(soup, "owner")
+    keywords = _extract_doc_attr(soup, "keywords")
+    if not keywords:
+        kw_span = soup.find("span", id="kb-page-keywords")
+        if kw_span:
+            keywords = kw_span.get_text(strip=True)
 
-    # 2. Strip noise elements before any text extraction
+    # 2. Strip noise elements
     for tag in soup.find_all(["script", "style", "header", "footer", "nav", "aside"]):
         tag.decompose()
     for tag in soup.find_all(class_="doc-attr"):
         tag.decompose()
-    # Feedback / analytics buttons
     for tag in soup.find_all(class_="feedback-btn"):
         tag.decompose()
 
-    # 2. Extract internal-staff section (then remove it from the tree)
+    # 3. Extract internal-staff section (then remove it from the tree)
     internal_text = ""
     internal_div = soup.find("div", class_="kb-class-internal-site")
     if internal_div:
         internal_text = internal_div.get_text(separator="\n", strip=True)
         internal_div.decompose()
 
-    # 3. Extract article ID from the "Show changes" link (resultc.php?action=7&id=XXXXX)
+    # 4. Extract article ID from the "Show changes" link (resultc.php?action=7&id=XXXXX)
     article_id = ""
     id_match = re.search(r'resultc\.php\?action=7&(?:amp;)?id=(\d+)', html)
     if id_match:
         article_id = id_match.group(1)
 
-    # 4. Extract title
+    # 5. Extract title
     title_tag = soup.find("title")
     title = title_tag.text.strip() if title_tag else path.stem
 
-    # 4. Extract keywords
-    keywords_span = soup.find("span", id="kb-page-keywords")
-    keywords = keywords_span.text.strip() if keywords_span else ""
-
-    # 5. Extract main content
-    content_div = soup.find("div", id="kbcontent")
-    if content_div:
-        content = content_div.get_text(separator="\n", strip=True)
+    # 6. Extract main content.
+    #    These articles use div.doc-body for the clean article body — no nav chrome,
+    #    no breadcrumbs, no site search dropdown.  Fall back through increasingly
+    #    noisy alternatives only when doc-body is absent.
+    doc_body = soup.find("div", class_="doc-body")
+    if doc_body:
+        for see_also in doc_body.find_all(class_="kb-page-see-also"):
+            see_also.decompose()
+        content = doc_body.get_text(separator="\n", strip=True)
     else:
-        # Fall back to body text if no kbcontent div
-        body = soup.find("body")
-        content = body.get_text(separator="\n", strip=True) if body else soup.get_text(separator="\n", strip=True)
+        content_div = (soup.find("div", id="kbcontent")
+                       or soup.find("div", id="page-content"))
+        if content_div:
+            content = content_div.get_text(separator="\n", strip=True)
+        else:
+            body = soup.find("body")
+            content = body.get_text(separator="\n", strip=True) if body else soup.get_text(separator="\n", strip=True)
+        # Strip leading nav artifacts present in non-doc-body fallbacks
+        content = re.sub(
+            r'^(?:Skip navigation\s*\n?|Edit page\s*\n?|Topics Map[^\n]*\n?)*',
+            '', content, flags=re.IGNORECASE,
+        ).strip()
 
     return {
         "filename": path.name,
@@ -315,10 +330,13 @@ def build_article_index(
     Returns a ``(vectorizer, doc_matrix)`` tuple.  The document matrix is
     pre-computed here so it does not need to be recomputed on every query.
     """
-    corpus = [
-        f"{a['title']} {a['keywords']} {a['content']}"
-        for a in articles
-    ]
+    corpus = []
+    for a in articles:
+        # Repeat title and keywords to boost their TF-IDF weight relative to body text.
+        # sublinear_tf dampens but does not eliminate the boost (log(1+3)/log(1+1) ≈ 2×).
+        title = a["title"]
+        kw = a["keywords"]
+        corpus.append(f"{title} {title} {title} {kw} {kw} {kw} {a['content']}")
     vectorizer = TfidfVectorizer(stop_words="english", sublinear_tf=True)
     doc_matrix = vectorizer.fit_transform(corpus)
     return vectorizer, doc_matrix
@@ -1222,7 +1240,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         btn.title = 'Copy step';
         btn.textContent = '\u2398';
         btn.addEventListener('click', function() {
-          const stepText = li.innerText.replace(/[\u2398\u2713]\s*$/, '').trim();
+          const stepText = li.innerText.replace(/[\u2398\u2713]\\s*$/, '').trim();
           navigator.clipboard.writeText(stepText).then(function() {
             btn.textContent = '\u2713';
             setTimeout(function() { btn.textContent = '\u2398'; }, 1500);
