@@ -159,3 +159,38 @@ def upload_articles_to_blob(
 
     logger.info("Uploaded %d articles to blob container '%s'", count, container_name)
     return count
+
+
+BLOB_ARTICLES_NAME = "articles.json"
+
+
+def upload_parsed_articles_to_blob(
+    articles: list,
+    contacts_text: str,
+    container_name: str,
+    blob_service,
+) -> None:
+    """Upload pre-parsed article data as a single articles.json blob.
+
+    Stores clean text extracted from HTML so the app never needs to parse
+    raw HTML at startup or during quality assessment.
+    """
+    payload = {"articles": articles, "contacts_text": contacts_text}
+    upload_blob_json(container_name, BLOB_ARTICLES_NAME, payload, blob_service)
+    logger.info("Uploaded %d parsed articles to blob as '%s'", len(articles), BLOB_ARTICLES_NAME)
+
+
+def download_parsed_articles_from_blob(
+    container_name: str,
+    blob_service,
+) -> "tuple[list, str] | None":
+    """Download parsed articles from blob. Returns (articles, contacts_text) or None."""
+    data = download_blob_json(container_name, BLOB_ARTICLES_NAME, blob_service)
+    if data is None:
+        return None
+    articles = data.get("articles", [])
+    contacts_text = data.get("contacts_text", "")
+    if not isinstance(articles, list) or not articles:
+        return None
+    logger.info("Downloaded %d parsed articles from blob", len(articles))
+    return articles, contacts_text

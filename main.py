@@ -789,12 +789,25 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     }
     #ai-body {
       flex: 1;
-      white-space: pre-wrap;
       word-wrap: break-word;
       line-height: 1.5;
       font-size: 13px;
       color: #cccccc;
     }
+    #ai-body p { margin: 0 0 2px 0; }
+    #ai-body h1, #ai-body h2, #ai-body h3, #ai-body h4 {
+      margin: 10px 0 4px 0; font-size: 13px; color: #e0e0e0; font-weight: bold;
+    }
+    #ai-body h1:first-child, #ai-body h2:first-child,
+    #ai-body h3:first-child, #ai-body h4:first-child { margin-top: 0; }
+    #ai-body strong { color: #e0e0e0; }
+    #ai-body ol, #ai-body ul { margin: 4px 0 8px 0; padding-left: 22px; }
+    #ai-body li { margin-bottom: 5px; line-height: 1.5; }
+    #ai-body hr { border: none; border-top: 1px solid #3a3a3a; margin: 8px 0; }
+    #ai-body blockquote { border-left: 3px solid #555; margin: 4px 0 4px 8px; padding-left: 8px; color: #aaa; }
+    #ai-body code { background: #333; padding: 1px 4px; border-radius: 2px; font-family: monospace; font-size: 12px; }
+    #ai-body pre { background: #333; padding: 6px 8px; border-radius: 3px; overflow-x: auto; margin: 4px 0; }
+    #ai-body pre code { background: none; padding: 0; }
     #ai-body a { color: #7aaee8; text-decoration: underline; }
     #ai-body a:hover { color: #aaccff; }
     .ai-loading {
@@ -897,6 +910,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       line-height: 1.4;
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/marked@14/marked.min.js"></script>
 </head>
 <body>
   <!-- HEADER -->
@@ -989,7 +1003,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         {% elif ai_error %}
           <div id="ai-body" class="ai-error">{{ ai_error }}</div>
         {% elif ai_response %}
-          <div id="ai-body">{{ ai_response | e }}</div>
+          <div id="ai-body" data-raw="{{ ai_response | e }}"></div>
           {% if ai_footer %}
             <div id="ai-footer">{{ ai_footer }}</div>
           {% endif %}
@@ -1194,21 +1208,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       if (feedbackArea) feedbackArea.style.display = 'none';
     }
 
+    function renderAiMarkdown(text) {
+      if (typeof marked === 'undefined') return '<pre>' + esc(text) + '</pre>';
+      marked.setOptions({ breaks: true, gfm: true });
+      return marked.parse(text);
+    }
+
     function addCopyButtons(container) {
-      const body = container.querySelector('#ai-body');
-      if (!body) return;
-      body.innerHTML = body.innerHTML.replace(
-        /^(\d+\.\s[^\n]+)$/gm,
-        (line) => `<span class="step-line">${line} <button class="btn-copy-step" title="Copy step">\u2398</button></span>`
-      );
-      body.addEventListener('click', function(e) {
-        const btn = e.target.closest('.btn-copy-step');
-        if (!btn) return;
-        const stepText = btn.parentElement.textContent.replace('\u2398', '').trim();
-        navigator.clipboard.writeText(stepText).then(() => {
-          btn.textContent = '\u2713';
-          setTimeout(() => btn.textContent = '\u2398', 1500);
+      container.querySelectorAll('li').forEach(function(li) {
+        if (li.querySelector('.btn-copy-step')) return;
+        const btn = document.createElement('button');
+        btn.className = 'btn-copy-step';
+        btn.title = 'Copy step';
+        btn.textContent = '\u2398';
+        btn.addEventListener('click', function() {
+          const stepText = li.innerText.replace(/[\u2398\u2713]\s*$/, '').trim();
+          navigator.clipboard.writeText(stepText).then(function() {
+            btn.textContent = '\u2713';
+            setTimeout(function() { btn.textContent = '\u2398'; }, 1500);
+          });
         });
+        li.appendChild(btn);
       });
     }
 
@@ -1221,7 +1241,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         if (data.conflicts && data.conflicts.length > 0) {
           conflictHtml = '<div class="conflict-alert">\u26a0 Note: The source articles for this response contain conflicting guidance. Verify steps directly with the relevant team before advising the client.</div>';
         }
-        let html = `${conflictHtml}<div id="ai-body">${esc(data.response)}</div>`;
+        let html = `${conflictHtml}<div id="ai-body">${renderAiMarkdown(data.response)}</div>`;
         if (data.footer) html += `<div id="ai-footer">${esc(data.footer)}</div>`;
         aiContent.innerHTML = html;
         addCopyButtons(aiContent);
@@ -1347,8 +1367,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       });
     }
 
-    // ── On page load: check server-rendered badges (e.g. after /refine) ───────
+    // ── On page load: re-render SSR content and check badges ────────────────
     window.addEventListener('DOMContentLoaded', function () {
+      // Re-render server-side AI response (e.g. after /refine) with marked
+      const aiBody = document.getElementById('ai-body');
+      if (aiBody && aiBody.dataset.raw && !aiBody.classList.contains('ai-error')) {
+        aiBody.innerHTML = renderAiMarkdown(aiBody.dataset.raw);
+        addCopyButtons(aiBody);
+      }
       const q = searchInput ? searchInput.value.trim() : '';
       if (q && braveSection) {
         const highBadges = document.querySelectorAll('.badge-high').length;
@@ -2116,13 +2142,20 @@ def create_app(
             return jsonify({"ok": False, "error": "Azure Blob Storage not configured."}), 503
         t0 = _time.time()
         try:
-            from blob_store import download_articles_from_blob
-            tmp_dir = Path(tempfile.mkdtemp(prefix="kb_articles_sync_"))
-            count = download_articles_from_blob(articles_container, tmp_dir, blob_service)
-            new_articles, new_contacts = load_articles(tmp_dir)
+            from blob_store import download_parsed_articles_from_blob, download_articles_from_blob
+            new_articles = None
+            # Prefer pre-parsed JSON blob; fall back to raw HTML
+            result = download_parsed_articles_from_blob(articles_container, blob_service)
+            if result:
+                new_articles, _ = result
+            else:
+                tmp_dir = Path(tempfile.mkdtemp(prefix="kb_articles_sync_"))
+                count = download_articles_from_blob(articles_container, tmp_dir, blob_service)
+                if count > 0:
+                    new_articles, _ = load_articles(tmp_dir)
             if not new_articles:
                 return jsonify({"ok": False, "error": "No articles found in blob container."}), 400
-            # Update app state in place
+            # Update app state in place (vectorizer rebuild requires restart)
             articles.clear()
             articles.extend(new_articles)
             _id_to_article.clear()
@@ -2244,19 +2277,28 @@ def main() -> None:
 
     if blob_service and articles_container:
         import tempfile
-        tmp_dir = Path(tempfile.mkdtemp(prefix="kb_articles_"))
         try:
-            count = download_articles_from_blob(articles_container, tmp_dir, blob_service)
-            if count > 0:
-                blob_articles, blob_contacts = load_articles(tmp_dir)
-                if blob_articles:
-                    articles = blob_articles
-                    contacts_text = blob_contacts
-                    # Rebuild index with blob articles
-                    vectorizer, doc_matrix = build_article_index(articles)
-                    if retriever is not None:
-                        retriever.build(articles, vectorizer, doc_matrix)
-                    print(f"Loaded {len(articles)} article(s) from Azure Blob Storage.")
+            from blob_store import download_parsed_articles_from_blob
+            result = download_parsed_articles_from_blob(articles_container, blob_service)
+            if result:
+                articles, contacts_text = result
+                vectorizer, doc_matrix = build_article_index(articles)
+                if retriever is not None:
+                    retriever.build(articles, vectorizer, doc_matrix)
+                print(f"Loaded {len(articles)} article(s) from Azure Blob Storage (parsed).")
+            else:
+                # Fall back to raw HTML blobs
+                tmp_dir = Path(tempfile.mkdtemp(prefix="kb_articles_"))
+                count = download_articles_from_blob(articles_container, tmp_dir, blob_service)
+                if count > 0:
+                    blob_articles, blob_contacts = load_articles(tmp_dir)
+                    if blob_articles:
+                        articles = blob_articles
+                        contacts_text = blob_contacts
+                        vectorizer, doc_matrix = build_article_index(articles)
+                        if retriever is not None:
+                            retriever.build(articles, vectorizer, doc_matrix)
+                        print(f"Loaded {len(articles)} article(s) from Azure Blob Storage (HTML).")
         except Exception as exc:
             print(f"Warning: Could not load articles from blob storage: {exc}", file=sys.stderr)
 

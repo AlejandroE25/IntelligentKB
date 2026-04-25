@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
-Upload KB article HTML files to Azure Blob Storage.
+Parse KB article HTML files locally and upload them as a single articles.json
+blob to Azure Blob Storage.
+
+Storing pre-parsed articles (clean extracted text) rather than raw HTML means
+the app never has to parse JavaScript-heavy HTML at startup or during quality
+assessment.
 
 Usage:
     python scripts/upload_articles.py --source ./articles/ --container articles
@@ -21,12 +26,21 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import blob_store
+from main import load_articles
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Upload KB articles to Azure Blob Storage.")
-    parser.add_argument("--source", default="./articles/", help="Local directory containing .htm/.html files")
-    parser.add_argument("--container", default="articles", help="Azure Blob container name")
+    parser = argparse.ArgumentParser(
+        description="Parse KB articles locally and upload as articles.json to Azure Blob Storage."
+    )
+    parser.add_argument(
+        "--source", default="./articles/",
+        help="Local directory containing .htm/.html files (default: ./articles/)",
+    )
+    parser.add_argument(
+        "--container", default="articles",
+        help="Azure Blob container name (default: articles)",
+    )
     args = parser.parse_args()
 
     source = Path(args.source).resolve()
@@ -34,8 +48,8 @@ def main() -> None:
         print(f"Error: Source directory not found: {source}", file=sys.stderr)
         sys.exit(1)
 
-    blob_service = blob_store.get_blob_service_client()
-    if blob_service is None:
+    service = blob_store.get_blob_service_client()
+    if service is None:
         print(
             "Error: Azure Blob Storage not configured.\n"
             "Set AZURE_STORAGE_CONNECTION_STRING or AZURE_STORAGE_ACCOUNT_NAME.",
@@ -43,14 +57,15 @@ def main() -> None:
         )
         sys.exit(1)
 
-    article_files = [p for p in source.iterdir() if p.suffix.lower() in (".htm", ".html")]
-    if not article_files:
-        print(f"No .htm/.html files found in {source}", file=sys.stderr)
+    print(f"Parsing articles from {source}...")
+    articles, contacts_text = load_articles(source)
+    if not articles:
+        print(f"Error: No .htm/.html files found in {source}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Uploading {len(article_files)} article(s) from {source} to container '{args.container}'...")
-    count = blob_store.upload_articles_to_blob(source, args.container, blob_service)
-    print(f"Done. {count} file(s) uploaded.")
+    print(f"Parsed {len(articles)} article(s). Uploading to container '{args.container}'...")
+    blob_store.upload_parsed_articles_to_blob(articles, contacts_text, args.container, service)
+    print(f"Done. {len(articles)} article(s) uploaded as articles.json.")
 
 
 if __name__ == "__main__":
