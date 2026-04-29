@@ -21,10 +21,12 @@ import json
 import logging
 import os
 import argparse
+import queue
 import re
 import secrets
 import subprocess
 import sys
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -39,7 +41,7 @@ from rank_bm25 import BM25Okapi
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import anthropic
-from flask import Flask, jsonify, render_template_string, request
+from flask import Flask, Response, jsonify, render_template_string, request, stream_with_context
 
 # Optional search-enhancement module – imported at module level so tests can
 # monkeypatch its FeatureFlags.  Falls back gracefully if the file is missing.
@@ -718,16 +720,27 @@ def run_agent(
     conversation: list[dict],
     articles: list[dict[str, str]],
     bm25_index: BM25Okapi,
+    on_progress: "Callable[[str, str], None] | None" = None,
 ) -> str | None:
     """Run the agentic loop, handling tool calls mid-response.
 
     ``conversation`` is the full message history up to and including the latest
     user turn.  Tool call / result turns are appended to a local copy and are
     NOT persisted to the session — only the final text reply is returned.
+
+    If *on_progress* is provided it is called with ``(step, message)`` whenever
+    the agent dispatches a tool call or is about to produce a final answer,
+    enabling callers to stream live status updates to the client.
     """
     messages = list(conversation)
 
-    for _ in range(MAX_AGENT_TURNS):
+    for turn in range(MAX_AGENT_TURNS):
+        if on_progress:
+            if turn == 0:
+                on_progress("thinking", "Reviewing initial search results…")
+            else:
+                on_progress("thinking", "Thinking…")
+
         response = client.messages.create(
             model=MODEL,
             max_tokens=MAX_TOKENS,
@@ -738,19 +751,25 @@ def run_agent(
 
         tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
         if not tool_use_blocks:
+            if on_progress:
+                on_progress("composing", "Composing answer…")
             text_blocks = [b for b in response.content if hasattr(b, "text")]
             return text_blocks[0].text if text_blocks else None
 
-        # Append assistant turn (contains tool_use blocks) and process results
+        # Notify caller about each tool being dispatched, then execute it.
         messages.append({"role": "assistant", "content": response.content})
-        tool_results = [
-            {
+        tool_results = []
+        for tb in tool_use_blocks:
+            if on_progress:
+                if tb.name == "search_articles":
+                    on_progress("searching", f"Searching KB for “{tb.input['query']}”…")
+                elif tb.name == "get_article":
+                    on_progress("reading", f"Reading article {tb.input['article_id']}…")
+            tool_results.append({
                 "type": "tool_result",
                 "tool_use_id": tb.id,
                 "content": handle_tool_call(tb, articles, bm25_index),
-            }
-            for tb in tool_use_blocks
-        ]
+            })
         messages.append({"role": "user", "content": tool_results})
 
     return None
@@ -1040,6 +1059,26 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     .ai-error {
       color: #d08080;
     }
+    #ai-progress-log {
+      padding: 6px 2px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .progress-step {
+      font-size: 12px;
+      font-style: italic;
+      color: #666;
+      padding: 1px 0;
+    }
+    .progress-step.active {
+      color: #7aaee8;
+    }
+    .progress-step.done {
+      color: #555;
+    }
+    .progress-step.done::before { content: "✓ "; }
+    .progress-step.active::before { content: "⟳ "; }
     #ai-footer {
       color: #777;
       font-size: 11px;
@@ -1425,10 +1464,28 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     // ── Async AI response ─────────────────────────────────────────────────────
     const feedbackArea = document.getElementById('feedback-area');
 
-    function showAiLoading() {
-      aiContent.innerHTML = '<p class="empty-state" style="color:#888;font-style:italic">Generating troubleshooting steps\u2026</p>';
+    function showAiLoading(firstMessage) {
+      const msg = firstMessage || 'Reviewing initial search results\u2026';
+      aiContent.innerHTML = '<div id="ai-progress-log"><div class="progress-step active" id="progress-current">' + esc(msg) + '</div></div>';
       if (refineArea)   refineArea.style.display = 'none';
       if (feedbackArea) feedbackArea.style.display = 'none';
+    }
+
+    function addProgressStep(message) {
+      const log = document.getElementById('ai-progress-log');
+      if (!log) return;
+      // Mark the current active step as done
+      const prev = log.querySelector('.progress-step.active');
+      if (prev) {
+        prev.classList.remove('active');
+        prev.classList.add('done');
+      }
+      // Append the new active step
+      const div = document.createElement('div');
+      div.className = 'progress-step active';
+      div.id = 'progress-current';
+      div.textContent = message;
+      log.appendChild(div);
     }
 
     function renderAiMarkdown(text) {
@@ -1502,14 +1559,37 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       activeAiController = controller;
       aiInFlight = true;
       setAiBusy(true);
-      showAiLoading();
+      showAiLoading('Reviewing initial search results…');
       const body = new FormData();
       body.append('query', query);
       if (refinement) body.append('refinement', refinement);
       try {
-        const resp = await fetch('/ai', { method: 'POST', body, signal: controller.signal });
-        const data = await resp.json();
-        showAiResult(data, query);
+        const resp = await fetch('/ai/stream', { method: 'POST', body, signal: controller.signal });
+        if (!resp.ok) throw new Error('Server error ' + resp.status);
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop();            // hold incomplete last line
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const raw = line.slice(6).trim();
+            if (!raw) continue;
+            let event;
+            try { event = JSON.parse(raw); } catch { continue; }
+            if (event.type === 'progress') {
+              addProgressStep(event.message);
+            } else if (event.type === 'result') {
+              showAiResult(event, query);
+            } else if (event.type === 'error') {
+              aiContent.innerHTML = '<div id="ai-body" class="ai-error">' + esc(event.error) + '</div>';
+            }
+          }
+        }
       } catch (err) {
         if (err && err.name === 'AbortError') return;
         aiContent.innerHTML = `<div id="ai-body" class="ai-error">Request failed: ${esc(String(err))}</div>`;
@@ -2298,6 +2378,101 @@ def create_app(
             "conflicts": [list(pair) for pair in conflicts],
             "has_quality_issues": has_quality_issues,
         })
+
+    @app.route("/ai/stream", methods=["POST"])
+    def ai_stream():
+        """SSE endpoint: streams agent progress events then the final result.
+
+        Each event is a JSON object on a ``data:`` line::
+
+            {"type": "progress", "step": "searching", "message": "Searching KB for \"vpn\"…"}
+            {"type": "result",   "response": "...", "footer": "...", ...}
+            {"type": "error",    "error": "..."}
+        """
+        query = request.form.get("query", "").strip()
+        refinement = request.form.get("refinement", "").strip()
+
+        if not query:
+            def _empty():
+                yield f"data: {json.dumps({'type': 'error', 'error': 'No query provided.'})}\n\n"
+            return Response(stream_with_context(_empty()), content_type="text/event-stream")
+
+        combined = (
+            f"[Original query]: {query} / [Refinement]: {refinement}"
+            if refinement else query
+        )
+        display = _get_display_articles(query)
+        display_scores = [score for _, score in display]
+        top_articles = _get_top_articles_for_claude(display)
+        high_conf_count = sum(
+            1 for i, (article, score) in enumerate(display)
+            if _classify_relevance_badge(score, i, display_scores, query, article)[0] == "High"
+        )
+        conflicts = _detect_conflicts(top_articles)
+        has_quality_issues = any(
+            (quality_assessments or {}).get(a["article_id"]) is not None
+            and (quality_assessments or {})[a["article_id"]].overall_score <= 3
+            for a in top_articles if a.get("article_id")
+        )
+
+        def _generate():
+            event_q: queue.Queue = queue.Queue()
+
+            def _on_progress(step: str, message: str) -> None:
+                event_q.put({"type": "progress", "step": step, "message": message})
+
+            def _run_in_bg() -> None:
+                try:
+                    system_prompt = build_agent_system_prompt(display, contacts_text, quality_assessments)
+                    msgs = [{"role": "user", "content": combined}]
+                    text = run_agent(client, system_prompt, msgs, articles, _bm25, on_progress=_on_progress)
+                    top_for_footer = [a for a, _ in display[:TOP_K_ARTICLES]]
+                    dates = [a["updated"] for a in top_for_footer if a.get("updated")]
+                    most_recent = max(dates) if dates else None
+                    footer = f"Searched {len(display)} articles · Analyzed top {len(top_for_footer)}"
+                    if most_recent:
+                        footer += f" · Most recent: {most_recent}"
+                    event_q.put({
+                        "type": "result",
+                        "response": text,
+                        "footer": footer,
+                        "error": "" if text else "No response received.",
+                        "high_conf_count": high_conf_count,
+                        "conflicts": [list(p) for p in conflicts],
+                        "has_quality_issues": has_quality_issues,
+                    })
+                except anthropic.RateLimitError:
+                    event_q.put({"type": "error", "error": (
+                        "Rate limit reached. Please wait a moment and try again."
+                    )})
+                except anthropic.APIError as exc:
+                    event_q.put({"type": "error", "error": f"API error: {exc}"})
+                except Exception as exc:
+                    logger.error("ai/stream background thread error: %s", exc)
+                    event_q.put({"type": "error", "error": "An unexpected error occurred."})
+                finally:
+                    event_q.put(None)  # sentinel — signals end of stream
+
+            t = threading.Thread(target=_run_in_bg, daemon=True)
+            t.start()
+
+            while True:
+                try:
+                    event = event_q.get(timeout=30)
+                except queue.Empty:
+                    yield ": keepalive\n\n"
+                    continue
+                if event is None:
+                    break
+                yield f"data: {json.dumps(event)}\n\n"
+
+            t.join(timeout=5)
+
+        return Response(
+            stream_with_context(_generate()),
+            content_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     @app.route("/articles")
     def articles_index():
