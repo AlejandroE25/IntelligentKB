@@ -28,7 +28,6 @@ import anthropic
 logger = logging.getLogger(__name__)
 
 QUALITY_CACHE_VERSION = "v1"
-QUALITY_ASSESSMENT_MAX_CHARS = 3000
 BLOB_QUALITY_CACHE_NAME = "quality_cache.json"
 
 _ASSESSMENT_PROMPT = """\
@@ -187,8 +186,6 @@ def assess_article_quality(
     """
     article_id = article.get("article_id", "")
     content = article.get("content", "")
-    if len(content) > QUALITY_ASSESSMENT_MAX_CHARS:
-        content = content[:QUALITY_ASSESSMENT_MAX_CHARS] + "\n\n[TRUNCATED]"
 
     prompt = _ASSESSMENT_PROMPT.format(
         article_id=article_id or "(unknown)",

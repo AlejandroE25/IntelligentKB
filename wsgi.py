@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 import anthropic
 from main import (
-    load_articles, build_article_index, create_app,
+    load_articles, build_article_index, build_bm25_index, create_app,
     ARTICLES_DIR, STALE_ARTICLE_YEARS, _SEARCH_ENHANCEMENT_AVAILABLE,
 )
 
@@ -12,6 +12,7 @@ load_dotenv()
 
 articles, contacts_text = load_articles(ARTICLES_DIR)
 vectorizer, doc_matrix = build_article_index(articles)
+bm25_index = build_bm25_index(articles)
 
 retriever = None
 if _SEARCH_ENHANCEMENT_AVAILABLE:
@@ -42,6 +43,7 @@ if blob_service and articles_container:
         if result:
             articles, contacts_text = result
             vectorizer, doc_matrix = build_article_index(articles)
+            bm25_index = build_bm25_index(articles)
             if retriever is not None:
                 retriever.build(articles, vectorizer, doc_matrix)
         else:
@@ -54,6 +56,7 @@ if blob_service and articles_container:
                     articles = blob_articles
                     contacts_text = blob_contacts
                     vectorizer, doc_matrix = build_article_index(articles)
+                    bm25_index = build_bm25_index(articles)
                     if retriever is not None:
                         retriever.build(articles, vectorizer, doc_matrix)
     except Exception:
@@ -79,6 +82,7 @@ app = create_app(
     client, articles, vectorizer, doc_matrix, contacts_text, retriever, brave_api_key,
     feedback_store=feedback_store,
     quality_assessments=quality_assessments,
+    bm25_index=bm25_index,
 )
 if blob_service:
     app.config["BLOB_SERVICE"] = blob_service
