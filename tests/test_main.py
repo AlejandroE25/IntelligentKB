@@ -382,8 +382,8 @@ class TestBuildArticleIndex:
 
 class TestSelectRelevantArticles:
     def _build(self, articles):
-        from main import build_article_index
-        return build_article_index(articles)
+        from main import build_bm25_index
+        return build_bm25_index(articles)
 
     def test_returns_top_k(self):
         from main import select_relevant_articles
@@ -393,33 +393,35 @@ class TestSelectRelevantArticles:
             _make_mock_article("3", content="password reset NetID"),
             _make_mock_article("4", content="email forwarding setup"),
         ]
-        vectorizer, matrix = self._build(articles)
-        results = select_relevant_articles("wifi connection problem", articles, vectorizer, matrix, top_k=2)
+        bm25_index = self._build(articles)
+        results = select_relevant_articles("wifi connection problem", articles, bm25_index, top_k=2)
         assert len(results) == 2
 
     def test_most_relevant_article_ranked_first(self):
         from main import select_relevant_articles
+        # Third article ensures BM25 IDF > 0 for terms that only appear in one doc.
         articles = [
             _make_mock_article("1", content="VPN Cisco installation Windows macOS"),
             _make_mock_article("2", content="wifi wireless IllinoisNet SecureW2 network"),
+            _make_mock_article("3", content="password reset NetID MFA multifactor"),
         ]
-        vectorizer, matrix = self._build(articles)
-        results = select_relevant_articles("wifi IllinoisNet", articles, vectorizer, matrix, top_k=2)
+        bm25_index = self._build(articles)
+        results = select_relevant_articles("wifi IllinoisNet", articles, bm25_index, top_k=3)
         assert results[0]["article_id"] == "2"
 
     def test_fallback_returns_all_when_no_match(self):
         from main import select_relevant_articles
         articles = [_make_mock_article("1"), _make_mock_article("2")]
-        vectorizer, matrix = self._build(articles)
-        # Query of only stop words produces zero vector -> fallback
-        results = select_relevant_articles("the and or", articles, vectorizer, matrix)
+        bm25_index = self._build(articles)
+        # BM25 always returns results; with 2 articles and default top_k=3 we get min(3,2)=2
+        results = select_relevant_articles("the and or", articles, bm25_index)
         assert len(results) == len(articles)
 
     def test_top_k_clamped_to_article_count(self):
         from main import select_relevant_articles
         articles = [_make_mock_article("1")]
-        vectorizer, matrix = self._build(articles)
-        results = select_relevant_articles("wifi", articles, vectorizer, matrix, top_k=10)
+        bm25_index = self._build(articles)
+        results = select_relevant_articles("wifi", articles, bm25_index, top_k=10)
         assert len(results) == 1
 
 
@@ -429,8 +431,8 @@ class TestSelectRelevantArticles:
 
 class TestSelectDisplayArticles:
     def _build(self, articles):
-        from main import build_article_index
-        return build_article_index(articles)
+        from main import build_bm25_index
+        return build_bm25_index(articles)
 
     def test_returns_tuples_of_article_and_score(self):
         from main import select_display_articles
@@ -438,8 +440,8 @@ class TestSelectDisplayArticles:
             _make_mock_article("1", content="wifi wireless network IllinoisNet"),
             _make_mock_article("2", content="VPN Cisco AnyConnect installation"),
         ]
-        vectorizer, matrix = self._build(articles)
-        results = select_display_articles("wifi connection", articles, vectorizer, matrix, display_k=2)
+        bm25_index = self._build(articles)
+        results = select_display_articles("wifi connection", articles, bm25_index, display_k=2)
         assert len(results) == 2
         for article, score in results:
             assert isinstance(article, dict)
@@ -447,12 +449,14 @@ class TestSelectDisplayArticles:
 
     def test_most_relevant_ranked_first(self):
         from main import select_display_articles
+        # Third article ensures BM25 IDF > 0 for terms that only appear in one doc.
         articles = [
             _make_mock_article("1", content="VPN Cisco installation Windows macOS"),
             _make_mock_article("2", content="wifi wireless IllinoisNet SecureW2 network"),
+            _make_mock_article("3", content="password reset NetID MFA multifactor"),
         ]
-        vectorizer, matrix = self._build(articles)
-        results = select_display_articles("wifi IllinoisNet", articles, vectorizer, matrix, display_k=2)
+        bm25_index = self._build(articles)
+        results = select_display_articles("wifi IllinoisNet", articles, bm25_index, display_k=3)
         assert results[0][0]["article_id"] == "2"
 
     def test_scores_descending(self):
@@ -462,23 +466,24 @@ class TestSelectDisplayArticles:
             _make_mock_article("2", content="VPN Cisco AnyConnect installation"),
             _make_mock_article("3", content="password reset NetID account"),
         ]
-        vectorizer, matrix = self._build(articles)
-        results = select_display_articles("wifi IllinoisNet", articles, vectorizer, matrix, display_k=3)
+        bm25_index = self._build(articles)
+        results = select_display_articles("wifi IllinoisNet", articles, bm25_index, display_k=3)
         scores = [score for _, score in results]
         assert scores == sorted(scores, reverse=True)
 
     def test_display_k_limits_results(self):
         from main import select_display_articles
         articles = [_make_mock_article(str(i), content=f"article {i} content topic") for i in range(6)]
-        vectorizer, matrix = self._build(articles)
-        results = select_display_articles("content topic", articles, vectorizer, matrix, display_k=3)
+        bm25_index = self._build(articles)
+        results = select_display_articles("content topic", articles, bm25_index, display_k=3)
         assert len(results) == 3
 
-    def test_fallback_on_zero_vector(self):
+    def test_scores_normalised_to_zero_on_no_match(self):
         from main import select_display_articles
         articles = [_make_mock_article("1"), _make_mock_article("2")]
-        vectorizer, matrix = self._build(articles)
-        results = select_display_articles("the and or", articles, vectorizer, matrix, display_k=5)
+        bm25_index = self._build(articles)
+        # Terms absent from corpus → all BM25 scores 0 → normalised to 0.0
+        results = select_display_articles("xyzzy qqqq zzzz", articles, bm25_index, display_k=5)
         assert all(score == 0.0 for _, score in results)
 
 
@@ -592,13 +597,13 @@ class TestFormatArticleForTool:
 
 class TestHandleToolCall:
     def _articles_and_index(self):
-        from main import build_article_index
+        from main import build_bm25_index
         articles = [
             _make_mock_article("1", content="wifi wireless IllinoisNet network SecureW2"),
             _make_mock_article("2", content="VPN Cisco AnyConnect installation guide"),
         ]
-        vectorizer, matrix = build_article_index(articles)
-        return articles, vectorizer, matrix
+        bm25_index = build_bm25_index(articles)
+        return articles, bm25_index
 
     def _make_tool_block(self, name: str, input_data: dict, tool_id: str = "tool_1"):
         tb = MagicMock()
@@ -609,42 +614,39 @@ class TestHandleToolCall:
 
     def test_search_articles_returns_content(self):
         from main import handle_tool_call
-        articles, vectorizer, matrix = self._articles_and_index()
+        articles, bm25_index = self._articles_and_index()
         tb = self._make_tool_block("search_articles", {"query": "wifi network"})
-        result = handle_tool_call(tb, articles, vectorizer, matrix)
+        result = handle_tool_call(tb, articles, bm25_index)
         assert "IllinoisNet" in result
 
     def test_search_articles_no_results_message(self):
-        from main import handle_tool_call, build_article_index
-        # Single article with content that won't match
-        articles = [_make_mock_article("1", content="the and or")]
-        vectorizer, matrix = build_article_index(articles)
-        # TF-IDF with only stop words will zero-vector and fall back to all articles,
-        # so test with a genuinely empty corpus response by mocking select_relevant_articles
+        from main import handle_tool_call, build_bm25_index
+        articles = [_make_mock_article("1", content="some content")]
+        bm25_index = build_bm25_index(articles)
         with patch("main.select_relevant_articles", return_value=[]):
             tb = self._make_tool_block("search_articles", {"query": "wifi"})
-            result = handle_tool_call(tb, articles, vectorizer, matrix)
+            result = handle_tool_call(tb, articles, bm25_index)
         assert "No relevant articles found" in result
 
     def test_get_article_by_id_returns_content(self):
         from main import handle_tool_call
-        articles, vectorizer, matrix = self._articles_and_index()
+        articles, bm25_index = self._articles_and_index()
         tb = self._make_tool_block("get_article", {"article_id": "1"})
-        result = handle_tool_call(tb, articles, vectorizer, matrix)
+        result = handle_tool_call(tb, articles, bm25_index)
         assert "IllinoisNet" in result
 
     def test_get_article_missing_id_returns_not_found(self):
         from main import handle_tool_call
-        articles, vectorizer, matrix = self._articles_and_index()
+        articles, bm25_index = self._articles_and_index()
         tb = self._make_tool_block("get_article", {"article_id": "99999"})
-        result = handle_tool_call(tb, articles, vectorizer, matrix)
+        result = handle_tool_call(tb, articles, bm25_index)
         assert "not found" in result.lower()
 
     def test_unknown_tool_returns_error_string(self):
         from main import handle_tool_call
-        articles, vectorizer, matrix = self._articles_and_index()
+        articles, bm25_index = self._articles_and_index()
         tb = self._make_tool_block("unknown_tool", {})
-        result = handle_tool_call(tb, articles, vectorizer, matrix)
+        result = handle_tool_call(tb, articles, bm25_index)
         assert "Unknown tool" in result
 
 
@@ -654,10 +656,10 @@ class TestHandleToolCall:
 
 class TestRunAgent:
     def _articles_and_index(self):
-        from main import build_article_index
+        from main import build_bm25_index
         articles = [_make_mock_article("1", content="Connect to wifi using SecureW2.")]
-        vectorizer, matrix = build_article_index(articles)
-        return articles, vectorizer, matrix
+        bm25_index = build_bm25_index(articles)
+        return articles, bm25_index
 
     def _make_text_response(self, text: str):
         block = MagicMock()
@@ -679,42 +681,42 @@ class TestRunAgent:
 
     def test_returns_text_on_direct_response(self):
         from main import run_agent
-        articles, vectorizer, matrix = self._articles_and_index()
+        articles, bm25_index = self._articles_and_index()
         client = MagicMock()
         client.messages.create.return_value = self._make_text_response("Here are the steps.")
-        result = run_agent(client, "system", [{"role": "user", "content": "wifi issue"}], articles, vectorizer, matrix)
+        result = run_agent(client, "system", [{"role": "user", "content": "wifi issue"}], articles, bm25_index)
         assert result == "Here are the steps."
 
     def test_handles_tool_call_then_text(self):
         from main import run_agent
-        articles, vectorizer, matrix = self._articles_and_index()
+        articles, bm25_index = self._articles_and_index()
         client = MagicMock()
         client.messages.create.side_effect = [
             self._make_tool_response("search_articles", {"query": "wifi"}),
             self._make_text_response("Based on the articles, here are the steps."),
         ]
-        result = run_agent(client, "system", [{"role": "user", "content": "wifi issue"}], articles, vectorizer, matrix)
+        result = run_agent(client, "system", [{"role": "user", "content": "wifi issue"}], articles, bm25_index)
         assert result == "Based on the articles, here are the steps."
         assert client.messages.create.call_count == 2
 
     def test_returns_none_when_no_text_block(self):
         from main import run_agent
-        articles, vectorizer, matrix = self._articles_and_index()
+        articles, bm25_index = self._articles_and_index()
         client = MagicMock()
         empty_response = MagicMock()
         empty_response.content = []
         client.messages.create.return_value = empty_response
-        result = run_agent(client, "system", [{"role": "user", "content": "issue"}], articles, vectorizer, matrix)
+        result = run_agent(client, "system", [{"role": "user", "content": "issue"}], articles, bm25_index)
         assert result is None
 
     def test_session_conversation_not_mutated(self):
         from main import run_agent
-        articles, vectorizer, matrix = self._articles_and_index()
+        articles, bm25_index = self._articles_and_index()
         client = MagicMock()
         client.messages.create.return_value = self._make_text_response("Answer.")
         conversation = [{"role": "user", "content": "question"}]
         original_len = len(conversation)
-        run_agent(client, "system", conversation, articles, vectorizer, matrix)
+        run_agent(client, "system", conversation, articles, bm25_index)
         assert len(conversation) == original_len
 
 
@@ -724,9 +726,10 @@ class TestRunAgent:
 
 class TestCreateApp:
     def _make_app(self, assistant_response: str = "Troubleshooting steps here."):
-        from main import create_app, build_article_index
+        from main import create_app, build_article_index, build_bm25_index
         articles = [_make_mock_article("1", content="wifi SecureW2 IllinoisNet")]
         vectorizer, matrix = build_article_index(articles)
+        bm25_index = build_bm25_index(articles)
         client = MagicMock()
 
         text_block = MagicMock()
@@ -736,7 +739,7 @@ class TestCreateApp:
         mock_response.content = [text_block]
         client.messages.create.return_value = mock_response
 
-        app = create_app(client, articles, vectorizer, matrix, contacts_text="")
+        app = create_app(client, articles, vectorizer, matrix, contacts_text="", bm25_index=bm25_index)
         app.config["TESTING"] = True
         app.config["SECRET_KEY"] = "test-secret"
         return app

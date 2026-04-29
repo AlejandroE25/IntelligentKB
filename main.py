@@ -35,6 +35,7 @@ from typing import Optional
 import numpy as np
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+from rank_bm25 import BM25Okapi
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import anthropic
@@ -93,6 +94,9 @@ BRAVE_SEARCH_API_URL = "https://api.search.brave.com/res/v1/web/search"
 BRAVE_MIN_HIGH_CONF = 1   # threshold (exclusive) of High-confidence KB articles
 BRAVE_RESULT_COUNT = 5    # number of Brave Search results to request
 
+# Bump manually on each release day (format: v0.YYYY.MM.DD).
+APP_VERSION = "v0.2026.04.29"
+
 SYSTEM_PROMPT_HEADER = (
     "You are a help desk assistant for University of Illinois Technology Services.\n"
     "Resolve support issues using ONLY the Knowledge Base articles provided. Do not use outside knowledge.\n"
@@ -125,6 +129,48 @@ SYSTEM_PROMPT_HEADER = (
     "'Note: Articles XXXXX and YYYYY give different instructions. Article XXXXX (more recent) says...'\n"
     "- If the provided articles lack enough information, use the available tools to search for or "
     "fetch additional articles before responding.\n"
+    "\n"
+    "## Escalation\n"
+    "Only suggest escalation as a last resort - after clarifying questions have not resolved the issue.\n"
+    "Use the [ESCALATION CONTACTS] section at the end of this prompt to route appropriately.\n"
+)
+
+AGENT_SYSTEM_PROMPT_HEADER = (
+    "You are a help desk assistant for University of Illinois Technology Services.\n"
+    "\n"
+    "## Your Search and Answer Process\n"
+    "You will be given a numbered list of initial search result summaries from the Knowledge Base.\n"
+    "Follow these steps in order:\n"
+    "1. Analyze the user's query against the initial summaries to understand which articles may be relevant.\n"
+    "2. Use `search_articles` to search for articles using more specific or alternative terms if the initial "
+    "results look incomplete or off-topic.\n"
+    "3. Use `get_article` to fetch the full content of the 2-3 articles that look most relevant.\n"
+    "4. After gathering full article content, synthesize your answer from those 2-3 articles ONLY.\n"
+    "5. Do NOT answer based solely on the initial summaries — always fetch full content first.\n"
+    "\n"
+    "## Response Format\n"
+    "Structure every response with these sections:\n"
+    "\n"
+    "**Issue:** One sentence identifying the problem.\n"
+    "\n"
+    "**Steps:**\n"
+    "1. [Exact step — copy-paste ready command or precise UI navigation path]. [Article XXXXX](url)\n"
+    "2. [Next step]. [Article XXXXX](url)\n"
+    "\n"
+    "**Source Reliability:** One sentence noting whether sources are current and consistent, "
+    "or flagging any staleness, conflicts, or quality issues.\n"
+    "\n"
+    "**If Unresolved:** Ask 1-2 targeted clarifying questions before suggesting escalation.\n"
+    "\n"
+    "## Rules\n"
+    "- Use only information from KB articles you have retrieved in full. Do not add general knowledge.\n"
+    "- Use plain language, but preserve exact names of systems, tools, buttons, and settings as written in the articles.\n"
+    "- Each response is independent; do not assume any prior context.\n"
+    "- Format all troubleshooting steps as a numbered list. Each step must be copy-paste ready.\n"
+    f"- If an article was last updated more than {STALE_ARTICLE_YEARS} years ago, note it inline.\n"
+    "- If an article is marked [QUALITY ALERT], state explicitly that you are working with "
+    "potentially unreliable source material.\n"
+    "- When articles conflict, do NOT silently prefer one. Name the conflict explicitly.\n"
     "\n"
     "## Escalation\n"
     "Only suggest escalation as a last resort - after clarifying questions have not resolved the issue.\n"
@@ -386,6 +432,55 @@ def build_article_index(
 
 
 # ---------------------------------------------------------------------------
+# BM25 index: fast lexical ranking for as-you-type search and tool-call search.
+# ---------------------------------------------------------------------------
+
+def build_bm25_index(articles: list[dict[str, str]]) -> BM25Okapi:
+    """Build a BM25 index over all KB articles with field-weight boosting.
+
+    Title tokens are repeated 3× and keyword tokens 2× before tokenizing so
+    that matches in those fields outrank pure body-text matches, approximating
+    the TF-IDF field weighting without a separate per-field index.
+    """
+    corpus = []
+    for a in articles:
+        title_tokens = (a.get("title", "") + " ") * 3
+        kw_tokens = (a.get("keywords", "") + " ") * 2
+        body = a.get("content", "")
+        combined = f"{title_tokens}{kw_tokens}{body}".lower().split()
+        corpus.append(combined if combined else [""])
+    # BM25Okapi requires at least one document; use a placeholder for empty corpora.
+    return BM25Okapi(corpus if corpus else [[""]])
+
+
+def select_articles_bm25(
+    query: str,
+    articles: list[dict[str, str]],
+    bm25_index: BM25Okapi,
+    top_k: int,
+) -> list[tuple[dict[str, str], float]]:
+    """Return the top *top_k* articles ranked by BM25 with scores normalised to [0, 1].
+
+    Scores are min-max normalised against the full result set so that the
+    existing badge thresholds (RELEVANCE_HIGH / RELEVANCE_MEDIUM) continue to
+    work without recalibration.  Returns an empty list if *articles* is empty.
+    """
+    if not articles:
+        return []
+    tokenized = _expand_query(query).lower().split()
+    raw_scores = bm25_index.get_scores(tokenized)
+
+    min_s, max_s = raw_scores.min(), raw_scores.max()
+    if max_s > min_s:
+        norm_scores = (raw_scores - min_s) / (max_s - min_s)
+    else:
+        norm_scores = np.zeros_like(raw_scores)
+
+    top_indices = np.argsort(norm_scores)[::-1][: min(top_k, len(articles))]
+    return [(articles[i], float(norm_scores[i])) for i in top_indices]
+
+
+# ---------------------------------------------------------------------------
 # Query expansion: phrases/tokens → additional search terms appended to query.
 # Applied unconditionally before TF-IDF so that natural-language problem
 # descriptions ("not working", "can't connect") map onto the vocabulary used
@@ -432,48 +527,34 @@ def _expand_query(query: str) -> str:
 def select_relevant_articles(
     query: str,
     articles: list[dict[str, str]],
-    vectorizer: TfidfVectorizer,
-    doc_matrix: np.ndarray,
+    bm25_index: BM25Okapi,
     top_k: int = TOP_K_ARTICLES,
 ) -> list[dict[str, str]]:
-    """Return the *top_k* articles most relevant to *query* using TF-IDF cosine similarity.
+    """Return the *top_k* articles most relevant to *query* using BM25.
 
-    Falls back to returning all articles if the query produces an all-zero
-    vector (e.g. it contains only stop-words not present in the corpus).
+    Falls back to returning all articles when the corpus is empty.
     """
-    query_vec = vectorizer.transform([_expand_query(query)])
-
-    scores = cosine_similarity(query_vec, doc_matrix).flatten()
-
-    # If every score is zero the query had no useful terms; return all articles.
-    if not np.any(scores):
+    pairs = select_articles_bm25(query, articles, bm25_index, top_k)
+    if not pairs:
         return articles
-
-    top_indices = np.argsort(scores)[::-1][: min(top_k, len(articles))]
-    return [articles[i] for i in top_indices]
+    return [a for a, _ in pairs]
 
 
 def select_display_articles(
     query: str,
     articles: list[dict[str, str]],
-    vectorizer: TfidfVectorizer,
-    doc_matrix: np.ndarray,
+    bm25_index: BM25Okapi,
     display_k: int = DISPLAY_K_ARTICLES,
 ) -> list[tuple[dict[str, str], float]]:
-    """Return the top *display_k* articles with their raw cosine similarity scores.
+    """Return the top *display_k* articles with their BM25 scores normalised to [0, 1].
 
     Returns a list of ``(article, score)`` tuples ordered by relevance descending.
-    Falls back to all articles (with score 0.0) when the query produces an
-    all-zero vector (e.g. only stop-words).
+    Falls back to all articles (with score 0.0) when the query has no useful terms.
     """
-    query_vec = vectorizer.transform([_expand_query(query)])
-    scores = cosine_similarity(query_vec, doc_matrix).flatten()
-
-    if not np.any(scores):
+    pairs = select_articles_bm25(query, articles, bm25_index, display_k)
+    if not pairs:
         return [(a, 0.0) for a in articles[:display_k]]
-
-    top_indices = np.argsort(scores)[::-1][: min(display_k, len(articles))]
-    return [(articles[i], float(scores[i])) for i in top_indices]
+    return pairs
 
 
 def fetch_brave_results(query: str, api_key: str, count: int = BRAVE_RESULT_COUNT) -> list[dict]:
@@ -546,6 +627,45 @@ def build_system_prompt(
     return "\n".join(lines)
 
 
+def build_agent_system_prompt(
+    initial_results: list[tuple[dict[str, str], float]],
+    contacts_text: str = "",
+    quality_assessments: dict | None = None,
+) -> str:
+    """Build the system prompt for the agentic reranking path.
+
+    Provides initial BM25 result summaries (title, article ID, keywords,
+    short excerpt) so Claude can plan its search strategy, then use
+    ``get_article`` / ``search_articles`` tool calls to fetch the 2-3
+    most relevant articles before answering.
+    """
+    lines = [AGENT_SYSTEM_PROMPT_HEADER, "", "--- INITIAL SEARCH RESULTS ---", ""]
+    for i, (article, _score) in enumerate(initial_results, start=1):
+        aid = article.get("article_id", "")
+        url = f"{KB_BASE_URL}/{aid}" if aid else ""
+        title = article.get("title", "(untitled)")
+        lines.append(f"{i}. {title} | Article {aid} | {url}")
+        if article.get("keywords"):
+            lines.append(f"   Keywords: {article['keywords']}")
+        excerpt = article.get("content", "")[:250].rstrip()
+        if excerpt:
+            lines.append(f"   Excerpt: {excerpt}...")
+        if quality_assessments and aid:
+            aq = quality_assessments.get(aid)
+            if aq and aq.overall_score <= 3:
+                from quality import format_quality_warning
+                warning = format_quality_warning(aq)
+                if warning:
+                    lines.append(f"   {warning}")
+        lines.append("")
+    if contacts_text:
+        trimmed_contacts = contacts_text[:MAX_CONTACTS_CHARS_IN_PROMPT]
+        if len(contacts_text) > MAX_CONTACTS_CHARS_IN_PROMPT:
+            trimmed_contacts += "\n\n[TRUNCATED]"
+        lines += ["--- [ESCALATION CONTACTS] ---", "", trimmed_contacts, ""]
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # Agentic Tool Handling
 # ---------------------------------------------------------------------------
@@ -572,13 +692,12 @@ def _format_article_for_tool(article: dict[str, str]) -> str:
 def handle_tool_call(
     tool_block,
     articles: list[dict[str, str]],
-    vectorizer: TfidfVectorizer,
-    doc_matrix: np.ndarray,
+    bm25_index: BM25Okapi,
 ) -> str:
     """Dispatch a single tool call and return the result string."""
     if tool_block.name == "search_articles":
         query = tool_block.input["query"]
-        results = select_relevant_articles(query, articles, vectorizer, doc_matrix)
+        results = select_relevant_articles(query, articles, bm25_index)
         if not results:
             return "No relevant articles found for that query."
         return "\n\n".join(_format_article_for_tool(a) for a in results)
@@ -598,8 +717,7 @@ def run_agent(
     system_prompt: str,
     conversation: list[dict],
     articles: list[dict[str, str]],
-    vectorizer: TfidfVectorizer,
-    doc_matrix: np.ndarray,
+    bm25_index: BM25Okapi,
 ) -> str | None:
     """Run the agentic loop, handling tool calls mid-response.
 
@@ -629,7 +747,7 @@ def run_agent(
             {
                 "type": "tool_result",
                 "tool_use_id": tb.id,
-                "content": handle_tool_call(tb, articles, vectorizer, doc_matrix),
+                "content": handle_tool_call(tb, articles, bm25_index),
             }
             for tb in tool_use_blocks
         ]
@@ -1022,7 +1140,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div id="page-header">
     <h1>iKB Search</h1>
     <a class="nav-link" href="/articles">Browse Articles</a>
-    <span class="build-badge">Build {{ build_number }}</span>
+    <span class="build-badge">{{ app_version }} &middot; Build {{ build_number }}</span>
     <form id="search-form" method="post" action="/">
       <input type="text" id="search-input" name="query"
              value="{{ query | e }}"
@@ -1628,7 +1746,7 @@ ARTICLES_TEMPLATE = """<!DOCTYPE html>
     <h1>iKB Search</h1>
     <a class="nav-link" href="/">← Back to Search</a>
     <span class="header-count">{{ article_count }} article{{ 's' if article_count != 1 else '' }} indexed</span>
-    <span class="build-badge">Build {{ build_number }}</span>
+    <span class="build-badge">{{ app_version }} &middot; Build {{ build_number }}</span>
   </div>
 
   <!-- CONTENT -->
@@ -1721,7 +1839,7 @@ ADMIN_TEMPLATE = """<!DOCTYPE html>
     <h1>iKB Search</h1>
     <a class="nav-link" href="/">← Back to Search</a>
     <a class="nav-link" href="/articles">Browse Articles</a>
-    <span class="build-badge">Build {{ build_number }}</span>
+    <span class="build-badge">{{ app_version }} &middot; Build {{ build_number }}</span>
   </div>
   <div id="content">
     <p class="warn-note">⚠ Admin dashboard — unauthenticated. Do not expose publicly without adding authentication.</p>
@@ -1817,17 +1935,19 @@ def create_app(
     brave_api_key: str = "",
     feedback_store=None,
     quality_assessments: dict | None = None,
+    bm25_index: BM25Okapi | None = None,
 ) -> Flask:
     """Create and configure the Flask application.
 
-    For each incoming query the TF-IDF index is used to select:
-    - DISPLAY_K_ARTICLES articles for the left panel (with scores for relevancy labels)
-    - TOP_K_ARTICLES articles to pass to Claude for the right panel
+    For each incoming query BM25 is used to select:
+    - DISPLAY_K_ARTICLES articles for the left panel (with normalised scores for relevancy labels)
+    - A summary of the top results is given to Claude, which then uses tool calls to fetch
+      full article content and rerank before answering.
 
     When *retriever* is provided (and its feature flags are enabled) the
-    hybrid retrieval path is used instead of direct TF-IDF cosine similarity.
+    hybrid retrieval path is used instead of BM25 for the display panel.
 
-    Claude may fetch additional articles mid-response via tool calls handled
+    Claude fetches full article content mid-response via tool calls handled
     by the agentic loop.
     """
     app = Flask(__name__)
@@ -1929,6 +2049,7 @@ def create_app(
             brave_min_high_conf=BRAVE_MIN_HIGH_CONF,
             brave_available=bool(brave_api_key),
             build_number=_build_number,
+            app_version=APP_VERSION,
             quality_map=quality_assessments or {},
             flag_counts=_flag_counts,
         )
@@ -1937,13 +2058,15 @@ def create_app(
     # Retrieval helpers (enhanced path when retriever is provided)
     # ------------------------------------------------------------------
 
+    # Build BM25 index lazily from articles if the caller didn't supply one.
+    _bm25: BM25Okapi = bm25_index if bm25_index is not None else build_bm25_index(articles)
+
     def _get_display_articles(
         query: str,
     ) -> list[tuple[dict[str, str], float]]:
         """Return display articles as (article, score) pairs.
 
-        Uses the hybrid retriever when available; otherwise falls back to the
-        original TF-IDF cosine similarity implementation.
+        Uses the hybrid retriever when available; otherwise uses BM25.
         """
         if retriever is not None:
             id_score_pairs, _ = retriever.retrieve(
@@ -1954,7 +2077,7 @@ def create_app(
                 for aid, score in id_score_pairs
                 if aid in _id_to_article
             ]
-        return select_display_articles(query, articles, vectorizer, doc_matrix)
+        return select_display_articles(query, articles, _bm25)
 
     def _get_top_articles_for_claude(
         display: list[tuple[dict[str, str], float]],
@@ -1999,26 +2122,33 @@ def create_app(
                             seen.append(pair)
         return seen
 
-    def _run_claude(query: str, top_articles: list[dict[str, str]]) -> tuple[str | None, str, str]:
-        """Run Claude for the given query and top articles.
+    def _run_claude(
+        query: str,
+        display: list[tuple[dict[str, str], float]],
+    ) -> tuple[str | None, str, str]:
+        """Run the Claude agent using the new agentic reranking flow.
+
+        Provides initial BM25 result summaries to Claude, which then uses tool
+        calls to fetch full article content and rerank before answering.
 
         Returns ``(ai_response, ai_footer, ai_error)``.
         """
-        system_prompt = build_system_prompt(top_articles, contacts_text, quality_assessments)
+        system_prompt = build_agent_system_prompt(display, contacts_text, quality_assessments)
         messages = [{"role": "user", "content": query}]
         ai_response = None
         ai_footer = ""
         ai_error = ""
         try:
-            ai_response = run_agent(client, system_prompt, messages, articles, vectorizer, doc_matrix)
+            ai_response = run_agent(client, system_prompt, messages, articles, _bm25)
             if ai_response is None:
                 ai_error = "No text response received from the assistant."
             else:
-                # Build footer: count articles and find most recent date
+                # Footer metadata based on top BM25 results as approximation
+                top_articles = [a for a, _ in display[:TOP_K_ARTICLES]]
                 n = len(top_articles)
                 dates = [a["updated"] for a in top_articles if a.get("updated")]
                 most_recent = max(dates) if dates else None
-                ai_footer = f"Generated from {n} article{'s' if n != 1 else ''}"
+                ai_footer = f"Searched {len(display)} articles · Analyzed top {n}"
                 if most_recent:
                     ai_footer += f" · Most recent: {most_recent}"
         except anthropic.RateLimitError:
@@ -2041,9 +2171,8 @@ def create_app(
 
         # Select articles for both panels in one pass
         display = _get_display_articles(query)
-        top_articles = _get_top_articles_for_claude(display)
 
-        ai_response, ai_footer, ai_error = _run_claude(query, top_articles)
+        ai_response, ai_footer, ai_error = _run_claude(query, display)
         return _render(
             query=query,
             display_articles=display,
@@ -2062,7 +2191,6 @@ def create_app(
 
         # Re-compute display articles from the original query (left panel unchanged)
         display = _get_display_articles(original_query)
-        top_articles = _get_top_articles_for_claude(display)
 
         # Build combined prompt for Claude
         if refinement:
@@ -2070,7 +2198,7 @@ def create_app(
         else:
             combined_query = original_query
 
-        ai_response, ai_footer, ai_error = _run_claude(combined_query, top_articles)
+        ai_response, ai_footer, ai_error = _run_claude(combined_query, display)
         return _render(
             query=original_query,
             display_articles=display,
@@ -2153,6 +2281,7 @@ def create_app(
             1 for i, (article, score) in enumerate(display)
             if _classify_relevance_badge(score, i, display_scores, query, article)[0] == "High"
         )
+        # Use top BM25 results as approximation for pre-flight conflict / quality checks.
         top_articles = _get_top_articles_for_claude(display)
         conflicts = _detect_conflicts(top_articles)
         has_quality_issues = any(
@@ -2160,7 +2289,7 @@ def create_app(
             and (quality_assessments or {})[a["article_id"]].overall_score <= 3
             for a in top_articles if a.get("article_id")
         )
-        ai_response, ai_footer, ai_error = _run_claude(combined, top_articles)
+        ai_response, ai_footer, ai_error = _run_claude(combined, display)
         return jsonify({
             "response": ai_response,
             "footer": ai_footer,
@@ -2180,6 +2309,7 @@ def create_app(
             article_count=len(sorted_articles),
             kb_base_url=KB_BASE_URL,
             build_number=_build_number,
+            app_version=APP_VERSION,
         )
 
     @app.route("/flag", methods=["POST"])
@@ -2231,6 +2361,7 @@ def create_app(
             rows=rows,
             summary=summary,
             build_number=_build_number,
+            app_version=APP_VERSION,
             kb_base_url=KB_BASE_URL,
             total_articles=len(articles),
             assessed_articles=assessed,
@@ -2352,6 +2483,7 @@ def main() -> None:
         print(f"    {a['filename']}")
 
     vectorizer, doc_matrix = build_article_index(articles)
+    bm25_index = build_bm25_index(articles)
 
     # Optionally initialise the hybrid retriever (no-op if all flags are False)
     retriever = None
@@ -2388,6 +2520,7 @@ def main() -> None:
             if result:
                 articles, contacts_text = result
                 vectorizer, doc_matrix = build_article_index(articles)
+                bm25_index = build_bm25_index(articles)
                 if retriever is not None:
                     retriever.build(articles, vectorizer, doc_matrix)
                 print(f"Loaded {len(articles)} article(s) from Azure Blob Storage (parsed).")
@@ -2401,6 +2534,7 @@ def main() -> None:
                         articles = blob_articles
                         contacts_text = blob_contacts
                         vectorizer, doc_matrix = build_article_index(articles)
+                        bm25_index = build_bm25_index(articles)
                         if retriever is not None:
                             retriever.build(articles, vectorizer, doc_matrix)
                         print(f"Loaded {len(articles)} article(s) from Azure Blob Storage (HTML).")
@@ -2432,6 +2566,7 @@ def main() -> None:
         client, articles, vectorizer, doc_matrix, contacts_text, retriever, brave_api_key,
         feedback_store=feedback_store,
         quality_assessments=quality_assessments,
+        bm25_index=bm25_index,
     )
     if blob_service:
         app.config["BLOB_SERVICE"] = blob_service
