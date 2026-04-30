@@ -1343,10 +1343,9 @@ class TestArticlesEndpoint:
             assert 'href="/"' in body
 
     def test_build_number_shown_on_articles_page(self, monkeypatch):
-        """The build number must appear in the articles page header."""
+        """The app version must appear in the articles page header."""
         import main as main_module
-        monkeypatch.setenv("BUILD_NUMBER", "test-build-99")
-        # Rebuild the app so _build_number is re-evaluated with the patched env
+        monkeypatch.setattr(main_module, "APP_VERSION", "v0.test-build-99")
         from main import build_article_index
         articles = [_make_mock_article("1", title="WiFi Guide")]
         vectorizer, matrix = build_article_index(articles)
@@ -1356,8 +1355,7 @@ class TestArticlesEndpoint:
         with app.test_client() as c:
             resp = c.get("/articles")
             body = resp.data.decode()
-        assert "test-build-99" in body
-        assert "Build" in body
+        assert "v0.test-build-99" in body
 
 
 # ---------------------------------------------------------------------------
@@ -1365,28 +1363,27 @@ class TestArticlesEndpoint:
 # ---------------------------------------------------------------------------
 
 class TestBuildNumberOnMainPage:
-    def _make_app(self, build_number: str = "build-42"):
+    def _make_app(self, app_version: str = "v0.2026.01.01-build42"):
         import main as main_module
         from main import build_article_index
         articles = [_make_mock_article()]
         vectorizer, matrix = build_article_index(articles)
         client = MagicMock()
-        with patch.object(main_module, "get_build_number", return_value=build_number):
+        with patch.object(main_module, "APP_VERSION", app_version):
             app = main_module.create_app(client, articles, vectorizer, matrix)
         app.config["TESTING"] = True
         return app
 
     def test_build_number_shown_on_home_page(self):
-        app = self._make_app("build-42")
+        app = self._make_app("v0.2026.01.01-build42")
         with app.test_client() as c:
             resp = c.get("/")
             body = resp.data.decode()
-        assert "build-42" in body
-        assert "Build" in body
+        assert "v0.2026.01.01-build42" in body
 
     def test_build_number_shown_after_search(self):
-        app = self._make_app("sha-abc1234")
+        app = self._make_app("v0.2026.01.01-abc1234")
         with app.test_client() as c:
             resp = c.post("/", data={"query": "wifi issue"})
             body = resp.data.decode()
-        assert "sha-abc1234" in body
+        assert "v0.2026.01.01-abc1234" in body
