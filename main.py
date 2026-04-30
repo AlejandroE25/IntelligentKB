@@ -64,11 +64,13 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message
 ARTICLES_DIR = Path(__file__).parent / "articles"
 CONTACTS_FILENAME = "contacts.html"
 MODEL = "claude-sonnet-4-20250514"
-MAX_TOKENS = int(os.environ.get("MAX_TOKENS", "1024"))
+MAX_TOKENS = int(os.environ.get("MAX_TOKENS", "2048"))
 
 # Guardrail: limit tool-loop turns so a single user request cannot spiral into
 # many Claude API calls when tool_use chains become long.
-MAX_AGENT_TURNS = int(os.environ.get("MAX_AGENT_TURNS", "3"))
+# The agentic flow requires search + fetch (1-2 tool turns) before the answer
+# turn, so 6 gives comfortable headroom without risking runaway loops.
+MAX_AGENT_TURNS = int(os.environ.get("MAX_AGENT_TURNS", "6"))
 
 # Soft prompt budget controls to reduce input token spend.
 MAX_ARTICLE_CHARS_IN_PROMPT = int(os.environ.get("MAX_ARTICLE_CHARS_IN_PROMPT", "2500"))
