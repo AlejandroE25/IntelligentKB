@@ -98,8 +98,29 @@ BRAVE_SEARCH_API_URL = "https://api.search.brave.com/res/v1/web/search"
 BRAVE_MIN_HIGH_CONF = 1   # threshold (exclusive) of High-confidence KB articles
 BRAVE_RESULT_COUNT = 5    # number of Brave Search results to request
 
-# Bump manually on each release day (format: v0.YYYY.MM.DD).
-APP_VERSION = "v0.2026.04.29"
+def _get_app_version() -> str:
+    """Derive app version from the git commit date (v0.YYYY.MM.DD).
+
+    Priority: APP_VERSION env var → git commit date → today's date.
+    """
+    env_ver = os.environ.get("APP_VERSION", "").strip()
+    if env_ver:
+        return env_ver
+    try:
+        date_str = subprocess.check_output(
+            ["git", "log", "-1", "--format=%cd", "--date=format:v0.%Y.%m.%d"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+        if date_str:
+            return date_str
+    except (subprocess.SubprocessError, OSError):
+        pass
+    from datetime import date as _date
+    return f"v0.{_date.today().strftime('%Y.%m.%d')}"
+
+
+APP_VERSION = _get_app_version()
 
 SYSTEM_PROMPT_HEADER = (
     "You are a help desk assistant for University of Illinois Technology Services.\n"
