@@ -99,9 +99,11 @@ BRAVE_MIN_HIGH_CONF = 1   # threshold (exclusive) of High-confidence KB articles
 BRAVE_RESULT_COUNT = 5    # number of Brave Search results to request
 
 def _get_app_version() -> str:
-    """Derive app version from the git commit date (v0.YYYY.MM.DD).
+    """Derive app version from the git commit date + short SHA (v0.YYYY.MM.DD-XXXXXXX).
 
-    Priority: APP_VERSION env var → git commit date → today's date.
+    Priority: APP_VERSION env var → git commit date+SHA → today's date fallback.
+    Folds the commit SHA into the version string so there is one canonical
+    build identifier even when the deployment has no .git directory.
     """
     env_ver = os.environ.get("APP_VERSION", "").strip()
     if env_ver:
@@ -112,6 +114,13 @@ def _get_app_version() -> str:
             stderr=subprocess.DEVNULL,
             text=True,
         ).strip()
+        sha_str = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+        if date_str and sha_str:
+            return f"{date_str}-{sha_str}"
         if date_str:
             return date_str
     except (subprocess.SubprocessError, OSError):
@@ -1202,7 +1211,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div id="page-header">
     <h1>iKB Search</h1>
     <a class="nav-link" href="/articles">Browse Articles</a>
-    <span class="build-badge">{{ app_version }} &middot; Build {{ build_number }}</span>
+    <span class="build-badge">{{ app_version }}</span>
     <form id="search-form" method="post" action="/">
       <input type="text" id="search-input" name="query"
              value="{{ query | e }}"
@@ -1849,7 +1858,7 @@ ARTICLES_TEMPLATE = """<!DOCTYPE html>
     <h1>iKB Search</h1>
     <a class="nav-link" href="/">← Back to Search</a>
     <span class="header-count">{{ article_count }} article{{ 's' if article_count != 1 else '' }} indexed</span>
-    <span class="build-badge">{{ app_version }} &middot; Build {{ build_number }}</span>
+    <span class="build-badge">{{ app_version }}</span>
   </div>
 
   <!-- CONTENT -->
@@ -1942,7 +1951,7 @@ ADMIN_TEMPLATE = """<!DOCTYPE html>
     <h1>iKB Search</h1>
     <a class="nav-link" href="/">← Back to Search</a>
     <a class="nav-link" href="/articles">Browse Articles</a>
-    <span class="build-badge">{{ app_version }} &middot; Build {{ build_number }}</span>
+    <span class="build-badge">{{ app_version }}</span>
   </div>
   <div id="content">
     <p class="warn-note">⚠ Admin dashboard — unauthenticated. Do not expose publicly without adding authentication.</p>
@@ -2056,8 +2065,9 @@ def create_app(
     app = Flask(__name__)
     app.secret_key = secrets.token_hex(32)
 
-    # Resolve the build number once at startup so every request uses the same value.
-    _build_number = get_build_number()
+    # Freeze version at app-creation time so tests can patch APP_VERSION before
+    # calling create_app() and see the patched value in every rendered response.
+    _app_version = APP_VERSION
 
     # Build article lookup map once for O(1) access in route helpers
     _id_to_article: dict[str, dict] = {a["article_id"]: a for a in articles}
@@ -2151,8 +2161,7 @@ def create_app(
             kb_base_url=KB_BASE_URL,
             brave_min_high_conf=BRAVE_MIN_HIGH_CONF,
             brave_available=bool(brave_api_key),
-            build_number=_build_number,
-            app_version=APP_VERSION,
+            app_version=_app_version,
             quality_map=quality_assessments or {},
             flag_counts=_flag_counts,
         )
@@ -2506,8 +2515,7 @@ def create_app(
             articles=sorted_articles,
             article_count=len(sorted_articles),
             kb_base_url=KB_BASE_URL,
-            build_number=_build_number,
-            app_version=APP_VERSION,
+            app_version=_app_version,
         )
 
     @app.route("/flag", methods=["POST"])
@@ -2558,8 +2566,7 @@ def create_app(
             ADMIN_TEMPLATE,
             rows=rows,
             summary=summary,
-            build_number=_build_number,
-            app_version=APP_VERSION,
+            app_version=_app_version,
             kb_base_url=KB_BASE_URL,
             total_articles=len(articles),
             assessed_articles=assessed,
