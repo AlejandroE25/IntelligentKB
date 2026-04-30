@@ -1573,7 +1573,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           const { value, done } = await reader.read();
           if (done) break;
           buf += decoder.decode(value, { stream: true });
-          const lines = buf.split('\n');
+          const lines = buf.split('\\n');
           buf = lines.pop();            // hold incomplete last line
           for (const line of lines) {
             if (!line.startsWith('data: ')) continue;
