@@ -63,7 +63,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message
 # ---------------------------------------------------------------------------
 ARTICLES_DIR = Path(__file__).parent / "articles"
 CONTACTS_FILENAME = "contacts.html"
-MODEL = "claude-sonnet-4-20250514"
+MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = int(os.environ.get("MAX_TOKENS", "2048"))
 
 # Guardrail: limit tool-loop turns so a single user request cannot spiral into
