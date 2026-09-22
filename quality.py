@@ -198,7 +198,7 @@ def assess_article_quality(
 
     try:
         response = client.messages.create(
-            model=os.environ.get("QUALITY_ASSESSMENT_MODEL", "claude-haiku-4-5-20251001"),
+            model=os.environ.get("QUALITY_ASSESSMENT_MODEL", "claude-haiku-4-5"),
             max_tokens=512,
             messages=[{"role": "user", "content": prompt}],
         )
