@@ -597,7 +597,7 @@ def fetch_brave_results(query: str, api_key: str, count: int = BRAVE_RESULT_COUN
     Each result is a dict with keys: ``title``, ``url``, ``description``.
     Returns an empty list if the API call fails for any reason.
     """
-    params = urllib.parse.urlencode({"q": query, "count": count})
+    params = urllib.parse.urlencode({"q": query + " UIUC", "count": count})
     url = f"{BRAVE_SEARCH_API_URL}?{params}"
     req = urllib.request.Request(
         url,
