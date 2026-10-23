@@ -817,6 +817,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>iKB Search</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     body {
@@ -1730,6 +1731,7 @@ ARTICLES_TEMPLATE = """<!DOCTYPE html>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>KB Articles – iKB Search</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     body {
@@ -1913,6 +1915,7 @@ ADMIN_TEMPLATE = """<!DOCTYPE html>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin: Article Quality – iKB Search</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 13px; background: #262626; color: #cccccc; margin: 0; padding: 0; }
