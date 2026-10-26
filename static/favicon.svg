@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <title>iKB Search</title>
-  <!-- dark navy background -->
-  <rect width="32" height="32" rx="6" fill="#1a2030"/>
-  <!-- Block I (UIUC Illini Orange) — the "i" -->
-  <rect x="3" y="4" width="8.5" height="3.5" rx="0.5" fill="#FF5F05"/>
-  <rect x="5.75" y="7.5" width="3" height="17" fill="#FF5F05"/>
-  <rect x="3" y="24.5" width="8.5" height="3.5" rx="0.5" fill="#FF5F05"/>
-  <!-- K -->
-  <rect x="13" y="4" width="2.5" height="24" rx="1" fill="#dce8f8"/>
-  <line x1="15.5" y1="15" x2="21" y2="4" stroke="#dce8f8" stroke-width="3" stroke-linecap="round"/>
-  <line x1="15.5" y1="17" x2="21" y2="28" stroke="#dce8f8" stroke-width="3" stroke-linecap="round"/>
-  <!-- B: upper loop (r=5, center at x=30.5) then lower loop (r=6.5, center at x=32) -->
-  <path d="M 22.5,4 L 25.5,4 A 5,5 0 0 1 25.5,14 L 22.5,14 L 22.5,15 L 25.5,15 A 6.5,6.5 0 0 1 25.5,28 L 22.5,28 Z" fill="#dce8f8"/>
+  <!-- Illini Blue background (official UIUC #13294B) -->
+  <rect width="32" height="32" rx="4" fill="#13294B"/>
+  <!-- Block I (Illini Orange #FF5F05) — left column, x=2–14, y=4–28 -->
+  <rect x="2" y="4" width="12" height="3" rx="0.5" fill="#FF5F05"/>
+  <rect x="5.5" y="7" width="5" height="18" fill="#FF5F05"/>
+  <rect x="2" y="25" width="12" height="3" rx="0.5" fill="#FF5F05"/>
+  <!-- K — upper right, y=4–15, arms to x=28 -->
+  <rect x="16.5" y="4" width="2.5" height="11" rx="0.8" fill="#dce8f8"/>
+  <line x1="19" y1="9.5" x2="28" y2="4"  stroke="#dce8f8" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="19" y1="9.5" x2="28" y2="15" stroke="#dce8f8" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- B — lower right, y=18–30, upper loop r=2.5 lower loop r=3 -->
+  <path d="M 16.5,18 L 20,18 A 2.5,2.5 0 0 1 20,23 L 16.5,23 L 16.5,24 L 20,24 A 3,3 0 0 1 20,30 L 16.5,30 Z" fill="#dce8f8"/>
 </svg>
